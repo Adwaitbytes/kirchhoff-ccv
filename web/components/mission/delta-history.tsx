@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useId, useMemo, useState } from "react";
-import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts";
 import { OctagonX } from "lucide-react";
 import type { EpochPoint } from "@/lib/api/types";
 import { formatAmount, formatDateTime, formatTime, parseWei } from "@/lib/format";
 import { shortHash, txRefUrl } from "@/lib/explorer";
 import { usePrefs } from "@/lib/prefs";
 import { StatusWord } from "@/components/kh/status";
+import { Verifiable } from "@/components/kh/links";
+import { CHAINS } from "@/lib/chains";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Point {
@@ -26,11 +28,14 @@ export function DeltaHistory({ epochs, decimals, symbol, view }: { epochs: Epoch
     () => [...epochs].reverse().map((e) => ({ t: Date.parse(e.evaluatedAt), delta: Number(parseWei(e.delta) / unit), epoch: e })),
     [epochs, unit],
   );
+  // Incidents numbered oldest first; the chart, its legend and the data table share the numbers.
   const incidents = useMemo(() => {
     const seen = new Map<string, Point>();
     for (const p of data) if (p.epoch.incidentId && !seen.has(p.epoch.incidentId)) seen.set(p.epoch.incidentId, p);
-    return [...seen.entries()].map(([id, p]) => ({ id, p }));
+    return [...seen.entries()].map(([id, p], i) => ({ id, p, n: i + 1 }));
   }, [data]);
+  const incidentNumber = useMemo(() => new Map(incidents.map((x) => [x.id, x.n])), [incidents]);
+  const [focused, setFocused] = useState<string | null>(null);
 
   const min = Math.min(0, ...data.map((d) => d.delta));
   const max = Math.max(0, ...data.map((d) => d.delta));
@@ -52,27 +57,45 @@ export function DeltaHistory({ epochs, decimals, symbol, view }: { epochs: Epoch
               <th scope="col" className="py-2 pl-4 pr-3 text-left font-medium">Time (UTC)</th>
               <th scope="col" className="px-3 text-left font-medium">Epoch</th>
               <th scope="col" className="px-3 text-right font-medium">Δ ({symbol})</th>
-              <th scope="col" className="py-2 pl-3 pr-4 text-right font-medium">Status</th>
+              <th scope="col" className="px-3 text-right font-medium">Status</th>
+              <th scope="col" className="py-2 pl-3 pr-4 text-left font-medium">Incident</th>
             </tr>
           </thead>
           <tbody>
-            {epochs.slice(0, 200).map((e) => {
+            {/* The latest 200 epochs, plus every older epoch that belongs to an incident so none drops off. */}
+            {epochs.filter((e, i) => i < 200 || e.incidentId !== null).map((e) => {
               const tx = e.reportTxs[0];
+              const delta = parseWei(e.delta);
               return (
                 <tr key={e.epochId} className="border-b border-wire/60">
                   <td className="py-1.5 pl-4 pr-3 font-mono text-muted">{formatTime(e.evaluatedAt)}</td>
                   <td className="px-3 font-mono">
                     {tx ? (
-                      <a href={txRefUrl(tx)} target="_blank" rel="noopener noreferrer" className="text-fg hover:underline">
+                      <Verifiable href={txRefUrl(tx)} label={`Epoch ${e.epochId}, its report transaction on ${CHAINS[tx.chain].name}`} className="text-fg">
                         {e.epochId}
-                      </a>
+                      </Verifiable>
                     ) : (
                       e.epochId
                     )}
                   </td>
-                  <td className={`px-3 text-right font-mono ${parseWei(e.delta) < 0n ? "text-broken" : "text-fg"}`}>{formatAmount(parseWei(e.delta), { decimals, signed: true })}</td>
-                  <td className="py-1.5 pl-3 pr-4 text-right">
+                  <td className={`px-3 text-right font-mono ${delta < 0n ? "text-broken" : "text-fg"}`}>
+                    {tx ? (
+                      <Verifiable href={txRefUrl(tx)} label={`Δ ${formatAmount(delta, { decimals, signed: true })} ${symbol} at epoch ${e.epochId}, epoch report transaction`}>
+                        {formatAmount(delta, { decimals, signed: true })}
+                      </Verifiable>
+                    ) : (
+                      formatAmount(delta, { decimals, signed: true })
+                    )}
+                  </td>
+                  <td className="px-3 text-right">
                     <StatusWord status={e.status} className="text-2xs" />
+                  </td>
+                  <td className="py-1.5 pl-3 pr-4">
+                    {e.incidentId ? (
+                      <Link href={`/app/incidents/${e.incidentId}`} className="whitespace-nowrap font-mono text-broken hover:underline" aria-label={`Incident ${incidentNumber.get(e.incidentId) ?? ""}, ${e.incidentId}. Open Incident Room`}>
+                        #{incidentNumber.get(e.incidentId)} {shortHash(e.incidentId)}
+                      </Link>
+                    ) : null}
                   </td>
                 </tr>
               );
@@ -137,7 +160,7 @@ export function DeltaHistory({ epochs, decimals, symbol, view }: { epochs: Epoch
             />
             <ReferenceLine y={0} stroke="var(--line-strong)" strokeDasharray="2 4" />
             {incidents.map(({ id, p }) => (
-              <ReferenceLine key={id} x={p.t} stroke="var(--status-broken)" strokeWidth={1.5} strokeDasharray="3 3" />
+              <ReferenceLine key={id} x={p.t} stroke="var(--status-broken)" strokeOpacity={0.45} strokeWidth={1} strokeDasharray="3 3" />
             ))}
             <RTooltip cursor={{ stroke: "var(--line-strong)" }} content={() => null} />
             <Area
@@ -152,25 +175,67 @@ export function DeltaHistory({ epochs, decimals, symbol, view }: { epochs: Epoch
               dot={false}
               activeDot={{ r: 3.5, stroke: "var(--bg-panel)", strokeWidth: 2, fill: "var(--fg)" }}
             />
+            {/* Dots only on the line: labels live in the legend below, so they can never collide. */}
+            {incidents.map(({ id, p, n }) => (
+              <ReferenceDot
+                key={id}
+                x={p.t}
+                y={p.delta}
+                ifOverflow="extendDomain"
+                shape={(props: { cx?: number; cy?: number }) => (
+                  <circle
+                    data-incident-dot={n}
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={focused === id ? 6 : 4}
+                    fill="var(--status-broken)"
+                    stroke="var(--bg-panel)"
+                    strokeWidth={2}
+                    style={{ transition: reducedMotion ? undefined : "r 160ms ease-out" }}
+                  />
+                )}
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex h-8 shrink-0 items-center gap-3 px-4 text-xs text-muted">
+      <div className="flex h-7 shrink-0 items-center px-4 text-xs text-muted">
         {hover ? (
-          <span className="font-mono tnum">
+          <span className="truncate font-mono tnum">
             {formatDateTime(hover.epoch.evaluatedAt)} · epoch {hover.epoch.epochId} · Δ {formatAmount(parseWei(hover.epoch.delta), { decimals, signed: true })} {symbol}
+            {hover.epoch.incidentId ? ` · incident #${incidentNumber.get(hover.epoch.incidentId) ?? ""}` : ""}
           </span>
-        ) : incidents.length > 0 ? (
-          incidents.map(({ id, p }) => (
-            <Link key={id} href={`/app/incidents/${id}`} className="inline-flex items-center gap-1.5 text-broken hover:underline">
-              <OctagonX className="size-3.5" aria-hidden="true" />
-              Incident {shortHash(id)} at {formatTime(p.epoch.evaluatedAt)}
-            </Link>
-          ))
-        ) : (
+        ) : incidents.length === 0 ? (
           <span>No incidents in the last 24 hours.</span>
+        ) : (
+          <span>
+            {incidents.length} incident{incidents.length === 1 ? "" : "s"} in the last 24 hours. Hover the chart for any epoch.
+          </span>
         )}
       </div>
+      {incidents.length > 0 ? (
+        <ul aria-label="Incidents on the chart, oldest first" data-testid="incident-legend" className="flex max-h-[3.25rem] shrink-0 flex-wrap items-center gap-x-1.5 gap-y-1 overflow-y-auto px-4 pb-2">
+          {incidents.map(({ id, p, n }) => (
+            <li key={id}>
+              <Link
+                href={`/app/incidents/${id}`}
+                data-testid="incident-marker-label"
+                onMouseEnter={() => setFocused(id)}
+                onMouseLeave={() => setFocused(null)}
+                onFocus={() => setFocused(id)}
+                onBlur={() => setFocused(null)}
+                aria-label={`Incident ${n}, ${id}, opened at ${formatTime(p.epoch.evaluatedAt)} UTC. Open Incident Room`}
+                title={`Incident ${shortHash(id)} at ${formatTime(p.epoch.evaluatedAt)}`}
+                className="inline-flex h-6 items-center gap-1.5 rounded-md border border-broken/30 bg-broken/[0.06] px-1.5 font-mono text-2xs text-broken transition-colors hover:border-broken/60 hover:bg-broken/10"
+              >
+                <OctagonX className="size-3" aria-hidden="true" />
+                <span className="font-semibold">#{n}</span>
+                <span className="text-muted tnum">{formatTime(p.epoch.evaluatedAt).slice(0, 5)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

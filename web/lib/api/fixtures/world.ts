@@ -56,7 +56,8 @@ export type FixtureScenario =
   | "recovered"
   | "loop"
   | "spec-pending"
-  | "no-epoch";
+  | "no-epoch"
+  | "incidents-24h";
 
 export const FIXTURE_SCENARIOS: readonly FixtureScenario[] = [
   "live",
@@ -74,6 +75,7 @@ export const FIXTURE_SCENARIOS: readonly FixtureScenario[] = [
   "loop",
   "spec-pending",
   "no-epoch",
+  "incidents-24h",
 ];
 
 export function isFixtureScenario(v: string | null): v is FixtureScenario {
@@ -347,6 +349,9 @@ export class FixtureWorld {
       case "spec-pending":
         this.pendingSpec = true;
         break;
+      case "incidents-24h":
+        this.seedIncidentHistory(keth);
+        break;
       case "drift":
         keth.status = "DRIFT";
         keth.reason = "FLOW_LIMIT";
@@ -372,6 +377,28 @@ export class FixtureWorld {
       default:
         break;
     }
+  }
+
+  /**
+   * Five past incidents in the 24h Δ history, two of them minutes apart, all resolved: the
+   * token is CONSERVED now. Exercises the chart's incident markers at their densest.
+   */
+  private seedIncidentHistory(s: TokenState): void {
+    const hoursAgo = [21, 14, 13.75, 6, 1.5];
+    hoursAgo.forEach((h, i) => {
+      const from = this.anchorMs - h * 3_600_000;
+      const to = from + 15 * 60_000;
+      const incidentId = fxHash(`${s.cfg.symbol}:history-incident:${i}`);
+      const deficit = -u(5_000 * (i + 1));
+      for (const e of s.epochs) {
+        const at = Date.parse(e.evaluatedAt);
+        if (at < from || at > to) continue;
+        e.delta = deficit.toString();
+        e.status = "BROKEN";
+        e.reason = "DEBIT_NOT_FOUND";
+        e.incidentId = incidentId;
+      }
+    });
   }
 
   private seedToken(cfg: TokenConfig): TokenState {
