@@ -505,7 +505,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 15.DK7 | Slide 7 business | `media/deck/build.cjs` `slideBusiness` | `media/deck/KIRCHHOFF.pptx` | DONE | |
 | 15.DK8 | Slide 8 limits and roadmap | `media/deck/build.cjs` `slideRoadmap` | `media/deck/KIRCHHOFF.pptx` | DONE | |
 | 15.SUB1 | Public repo with README, diagram, addresses, workflow ids, Kelp Replay how-to | `README.md` | https://github.com/Adwaitbytes/kirchhoff-ccv (public, `main` in sync with origin) | DONE | Workflow ids are the CRE simulation ids; DON ids need deploy access (8.C2) |
-| 15.SUB2 | Live URL: read-only Mission Control with "Replay last incident" | `web/components/mission/incident-replay.tsx`, `web/vercel.json`, `api/vercel.json` | https://kirchhoff-two.vercel.app (live, sin1) | PENDING | Deployed read-only. The live read model was last indexed at Sepolia block 11850609, before the testnet incidents, so "Replay last incident" has no testnet incident yet |
+| 15.SUB2 | Live URL: read-only Mission Control with "Replay last incident" | `web/components/mission/incident-replay.tsx`, `indexer/`, `api/` | https://kirchhoff-two.vercel.app (live read model of ledger 0x3c1de69ba8e3a337cfe44ee16696b3bc7b8613aa) | DONE | Public read-only Mission Control on the hackathon-window deployment with the Replay last incident player; the indexer follows the three testnets continuously into Neon (Singapore) |
 | 15.SUB3 | Deck .pptx with the video on Google Drive | `media/deck/KIRCHHOFF.pptx` | none | PENDING | Deferred by product owner (demo video work paused until the owner asks); deck exists without the video and is not uploaded |
 | 15.SUB4 | Main and Chainlink track submissions with the CRE and CCIP paragraph | `SUBMISSION.md` | n/a | PENDING | Paragraphs drafted |
 | 15.SUB5 | Submitted before 11:59 pm, October 7 | n/a | n/a | PENDING | |
@@ -530,7 +530,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 16.TM4 | CRE lead: W1 and W2 simulating green against testnets | `workflows/` | SIM_LOG staging section (W2 `--broadcast`, W4); `workflows/runner.log.jsonl` | PENDING | W2 green on all 3 testnets (first EPOCH, Loop BREACH, RECOVERY_CHECK); W1 has no recorded green staging run yet (the runner hit RPC 429s) |
 | 16.TM5 | Engine at 100% branch coverage | `engine/` | coverage run | DONE | |
 | 16.TM6 | CCV/infra: Judge live in a cell, or Fallback B | `ccv/`, `judge/` | STATUS.md | FALLBACK | Fallback B primary |
-| 16.TM7 | Frontend lead: hero screen on live data | `web/` | https://kirchhoff-two.vercel.app; Playwright on fixtures | PENDING | Live on the testnet read model, but the indexer is not running continuously (last indexed Sepolia block 11850609) |
+| 16.TM7 | Frontend lead: hero screen on live data | `web/` | https://kirchhoff-two.vercel.app serving the new deployment | DONE | Hero screen on live testnet data |
 | 16.TM8 | Frontend 2: all screens with real states | `web/` | MCs, IRs | DONE | |
 | 16.TM9 | AI + API: indexer, Copilot, Narrator | `indexer/`, `ai/`, `api/` | package tests | DONE | |
 | 16.HG1 | Hour 4: ABI freeze | `docs/INTERFACES.md`, `contracts/src/interfaces/` | commit `d8aebf6` | DONE | |
@@ -576,7 +576,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 17.SC6 | Donation: Δ rises, CONSERVED, UI shows surplus | same; `conservation-meter.tsx` | scenario 6 PASS | DONE | |
 | 17.DOD1 | Tests written and green | all packages | baseline table above | DONE | |
 | 17.DOD2 | Works on the 3 public testnets, not just Anvil | `deployments/testnet.json` | Ledgers written by CRE simulation on all 3 testnets (README "Testnet transactions") | PENDING | EPOCH, Loop BREACH, W3 quarantine, Safe resolution and RECOVERY_CHECK ran on testnets; a passing full e2e is pending (1.R6) |
-| 17.DOD3 | Every number links to an explorer tx or onchain read | `links.tsx`, `explorer.ts` | `web/e2e/ops-links.spec.ts` sweeps every Verifier Ops figure; MCs checks Δ and status pill | PENDING | Ops figures link to their source or are marked not public; no sweep yet over every Mission Control and Incident Room number |
+| 17.DOD3 | Every number links to an explorer tx or onchain read | `web/components/kh/links.tsx`, `web/lib/explorer.ts` | `web/e2e/number-links.spec.ts` (Playwright 129/129); `web/e2e/ops-links.spec.ts` | DONE | Every figure on every screen links to its explorer transaction, onchain read or metrics source, asserted by a Playwright sweep |
 | 17.DOD4 | Loading, empty, stale, error, breach states | 12.ST1-5 | MCs | DONE | |
 | 17.DOD5 | No em dashes in user-facing copy | `web/` | `grep -rn` for U+2014 in `web/app web/components web/lib`: 0 | DONE | |
 
