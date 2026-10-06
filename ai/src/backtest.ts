@@ -1,13 +1,24 @@
-import { toEventSelector, type PublicClient } from "viem";
-import { backtest, reasonName, type Credit, type Debit, type HistoryEvent, type TokenSpec } from "@kirchhoff/engine";
+import { parseAbi, parseAbiItem, toEventSelector, type PublicClient } from "viem";
+import {
+  escrowHolders,
+  reasonName,
+  replayHistory,
+  type ChainRef,
+  type EpochBoundary,
+  type EpochSchedule,
+  type ReplayChain,
+  type ReplayEvent,
+  type TokenSpec,
+} from "@kirchhoff/engine";
+import { adaptersForSpec, type Log } from "@kirchhoff/engine/adapters";
 import { parseSpec, specHash, validateSpec } from "@kirchhoff/engine/spec";
-import { decodeLogs, watchedAddresses } from "@kirchhoff/indexer";
-import { CHAINS, chainBySelector, erc20Abi, isChainKey, type Address, type BacktestResponse, type ChainDeploymentInfo, type ChainKey, type Hex, type TxRef } from "@kirchhoff/sdk";
+import { CHAINS, chainBySelector, isChainKey, type Address, type BacktestResponse, type ChainKey, type Hex, type TxRef } from "@kirchhoff/sdk";
 
 /**
  * Spec lifecycle step 3 (PRD section 6): replay the token's event history through the
- * deterministic engine. Shared by POST /specs/backtest and the Copilot's backtest_spec tool.
- * The engine decides; this module only fetches history and maps the result.
+ * deterministic engine, epoch by epoch (engine replayHistory). Shared by POST /specs/backtest and
+ * the Copilot's backtest_spec tool. The engine decides; this module only fetches history and maps
+ * the result.
  */
 
 export type BacktestBody = Omit<BacktestResponse, "source" | "ledger" | "block" | "servedAt">;
@@ -22,48 +33,67 @@ export class SpecInvalidError extends Error {
 }
 
 const ZERO: Address = "0x0000000000000000000000000000000000000000";
-const ZERO_HASH: Hex = `0x${"0".repeat(64)}`;
+const ZERO_TOPIC: Hex = `0x${"0".repeat(64)}`;
 const isZero = (a: string | null | undefined): boolean => !a || BigInt(a) === 0n;
 
-function pseudoDeployment(spec: TokenSpec, chain: ChainKey, alias: string, role: "home" | "remote", token: Address): ChainDeploymentInfo {
-  const custom = spec.bridges.find((b) => b.kind === "custom");
-  const ccip = spec.bridges.find((b) => b.kind === "ccip_v2");
-  const at = (m: Readonly<Record<string, Hex>> | undefined): Address | null => {
-    const v = m?.[alias];
-    return isZero(v) ? null : (v?.toLowerCase() as Address);
-  };
-  const emitter = custom?.kind === "custom" ? at(custom.contracts) : null;
-  return {
-    chain,
-    chainId: 0,
-    mode: "local",
-    role,
-    tokenSymbol: spec.token,
-    // Ledger, quarantine and feed are not history sources for a backtest; ZERO never matches a log address.
-    ledger: ZERO,
-    quarantine: ZERO,
-    feed: ZERO,
-    guard: null,
-    registry: null,
-    token,
-    escrow: role === "home" ? emitter : null,
-    weakBridge: emitter,
-    ccipPool: ccip?.kind === "ccip_v2" ? at(ccip.pools) : null,
-    ccipLockBox: role === "home" && ccip?.kind === "ccip_v2" && !isZero(ccip.lockbox) ? (ccip.lockbox?.toLowerCase() as Address) : null,
-    onRamp: ccip?.kind === "ccip_v2" ? at(ccip.onramps) : null,
-    offRamp: ccip?.kind === "ccip_v2" ? at(ccip.offramps) : null,
-    tokenAdminRegistry: null,
-    lendingMarket: null,
-    issuerSafe: null,
-    deployedAtBlock: null,
-  };
+/**
+ * The token's own movement event and its reads, in the spec's unit (PRD section 10): a rebasing
+ * `unit: shares` token is replayed in shares (Lido-style TransferShares, getTotalShares, sharesOf).
+ */
+const UNIT_READS = {
+  tokens: {
+    event: parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)"),
+    amountArg: "value",
+    abi: parseAbi(["function totalSupply() view returns (uint256)", "function balanceOf(address) view returns (uint256)"]),
+    supply: "totalSupply",
+    balance: "balanceOf",
+  },
+  shares: {
+    event: parseAbiItem("event TransferShares(address indexed from, address indexed to, uint256 sharesValue)"),
+    amountArg: "sharesValue",
+    abi: parseAbi(["function getTotalShares() view returns (uint256)", "function sharesOf(address) view returns (uint256)"]),
+    supply: "getTotalShares",
+    balance: "sharesOf",
+  },
+} as const;
+
+/** Every bridge contract the spec declares on a chain: the logs the adapters decode. */
+function bridgeAddresses(spec: TokenSpec, chain: ChainRef): Address[] {
+  const out = new Set<Address>();
+  for (const b of spec.bridges) {
+    const maps = b.kind === "ccip_v2" ? [b.pools, b.onramps, b.offramps] : [b.contracts];
+    for (const m of maps) {
+      const a = m[chain.alias];
+      if (!isZero(a)) out.add(a?.toLowerCase() as Address);
+    }
+  }
+  return [...out];
 }
+
+type RpcLog = { address: Hex; topics: readonly Hex[]; data: Hex; transactionHash: Hex | null; blockNumber: bigint | null; logIndex: number | null };
+type MinedLog = Log & { logIndex: number };
+
+function mined(logs: readonly RpcLog[]): MinedLog[] {
+  return logs.flatMap((l) =>
+    l.transactionHash === null || l.blockNumber === null || l.logIndex === null
+      ? []
+      : [{ address: l.address, topics: l.topics, data: l.data, transactionHash: l.transactionHash, blockNumber: l.blockNumber, logIndex: l.logIndex }],
+  );
+}
+
+const ranges = (from: bigint, to: bigint, chunk: bigint): [bigint, bigint][] => {
+  const out: [bigint, bigint][] = [];
+  for (let start = from; start <= to; start += chunk) out.push([start, start + chunk - 1n < to ? start + chunk - 1n : to]);
+  return out;
+};
 
 export type BacktestDeps = {
   clients: Partial<Record<ChainKey, PublicClient>>;
   /** Default start when the request names none: genesis on Anvil, a recent window on testnets. */
   defaultLookback: bigint | null;
   maxChunk?: bigint;
+  /** Loop epoch boundaries for the replay; after every supply-moving block by default. */
+  epochs?: EpochSchedule;
 };
 
 export async function backtestYaml(yaml: string, fromBlock: Partial<Record<ChainKey, bigint>>, deps: BacktestDeps): Promise<BacktestBody> {
@@ -71,106 +101,145 @@ export async function backtestYaml(yaml: string, fromBlock: Partial<Record<Chain
   const parsed = parseSpec(yaml);
   if (!parsed.ok) throw new SpecInvalidError(parsed.errors);
   const spec = parsed.spec;
+  let adapters: ReturnType<typeof adaptersForSpec>;
+  try {
+    adapters = adaptersForSpec(spec);
+  } catch (e) {
+    throw new SpecInvalidError([e instanceof Error ? e.message : String(e)]);
+  }
+  const unit = UNIT_READS[spec.unit];
+  const holders = escrowHolders(spec).filter((h) => !isZero(h)).map((h) => h.toLowerCase() as Address);
   const chains = [
-    { name: spec.home.chain.name, alias: spec.home.chain.alias, role: "home" as const, token: spec.home.canonical },
-    ...spec.remotes.map((r) => ({ name: r.chain.name, alias: r.chain.alias, role: "remote" as const, token: r.token })),
+    { ref: spec.home.chain, token: spec.home.canonical },
+    ...spec.remotes.map((r) => ({ ref: r.chain, token: r.token })),
   ];
-  const events: (HistoryEvent & { at: bigint; order: bigint })[] = [];
+  const events: ReplayEvent[] = [];
+  const windows: ReplayChain[] = [];
+  const escrowAtHead: { holder: Hex; balance: bigint }[] = [];
   const coverage: BacktestBody["coverage"] = [];
-  const pinned: { chain: bigint; block: bigint }[] = [];
-  const supplies: { chain: bigint; supply: bigint }[] = [];
-  const sources = new Map<bigint, { head: bigint; headTimestamp: bigint }>();
-  const creditTx = new Map<string, TxRef>();
-  let escrow = 0n;
-  let latest = 0n;
+  const txRefs = new Map<string, TxRef>();
   const debitIds = new Set<string>();
   const creditIds = new Map<ChainKey, Set<string>>();
-  for (const c of chains) {
-    if (!isChainKey(c.name)) throw new SpecInvalidError([`chain ${c.name} is not supported`]);
-    if (isZero(c.token)) throw new SpecInvalidError([`${c.name} token address is a placeholder`]);
-    const client = deps.clients[c.name];
-    if (!client) throw new SpecInvalidError([`no RPC configured for ${c.name}`]);
-    const selector = CHAINS[c.name].selector;
-    const dep = pseudoDeployment(spec, c.name, c.alias, c.role, c.token.toLowerCase() as Address);
+  for (const { ref, token } of chains) {
+    const name = ref.name;
+    if (!isChainKey(name)) throw new SpecInvalidError([`chain ${name} is not supported`]);
+    if (isZero(token)) throw new SpecInvalidError([`${name} token address is a placeholder`]);
+    const client = deps.clients[name];
+    if (!client) throw new SpecInvalidError([`no RPC configured for ${name}`]);
+    const selector = CHAINS[name].selector;
     const headBlock = await client.getBlock({ blockTag: "latest" });
     const head = headBlock.number;
-    const from = fromBlock[c.name] ?? (deps.defaultLookback === null ? 0n : head > deps.defaultLookback ? head - deps.defaultLookback : 0n);
-    const addresses = watchedAddresses(dep).filter((a) => a !== ZERO);
+    const from = fromBlock[name] ?? (deps.defaultLookback === null ? 0n : head > deps.defaultLookback ? head - deps.defaultLookback : 0n);
+    const chunk = deps.maxChunk ?? 2_000n;
+    const isHomeChain = ref.selector === spec.home.chain.selector;
+    const watch = isHomeChain ? [ZERO, ...holders] : [ZERO];
+    const times = new Map<bigint, bigint>();
+    const timeOf = async (block: bigint): Promise<bigint> => {
+      const known = times.get(block);
+      if (known !== undefined) return known;
+      const ts = (await client.getBlock({ blockNumber: block })).timestamp;
+      times.set(block, ts);
+      return ts;
+    };
+    const tokenAddress = token.toLowerCase() as Address;
+    const bridges = bridgeAddresses(spec, ref);
     let debits = 0;
     let credits = 0;
-    const chunk = deps.maxChunk ?? 2_000n;
-    const times = new Map<bigint, bigint>();
-    for (let start = from; start <= head && addresses.length > 0; start += chunk) {
-      const end = start + chunk - 1n < head ? start + chunk - 1n : head;
-      const logs = await client.getLogs({ address: addresses, fromBlock: start, toBlock: end });
-      for (const ev of decodeLogs(logs, dep)) {
-        if (ev.kind !== "Debit" && ev.kind !== "Credit") continue;
-        let ts = times.get(ev.block);
-        if (ts === undefined) {
-          ts = (await client.getBlock({ blockNumber: ev.block })).timestamp;
-          times.set(ev.block, ts);
+    for (const [start, end] of ranges(from, head, chunk)) {
+      const bridgeLogs = bridges.length === 0 ? [] : mined(await client.getLogs({ address: bridges, fromBlock: start, toBlock: end }));
+      // Only supply and escrow moves matter to the Loop Rule: transfers from or to zero or an escrow holder.
+      const [outgoing, incoming] = await Promise.all([
+        client.getLogs({ address: tokenAddress, event: unit.event, args: { from: watch }, fromBlock: start, toBlock: end }),
+        client.getLogs({ address: tokenAddress, event: unit.event, args: { to: watch }, fromBlock: start, toBlock: end }),
+      ]);
+      const seen = new Set<string>();
+      for (const l of mined([...outgoing, ...incoming])) {
+        const key = `${l.transactionHash}:${l.logIndex.toString()}`;
+        if (seen.has(key) || l.topics.length !== 3) continue;
+        seen.add(key);
+        const amount = BigInt(l.data);
+        const fromTopic = l.topics[1] ?? ZERO_TOPIC;
+        const toTopic = l.topics[2] ?? ZERO_TOPIC;
+        const at = { chain: selector, block: l.blockNumber, logIndex: l.logIndex, timestamp: await timeOf(l.blockNumber), txHash: l.transactionHash };
+        events.push({ ...at, kind: "transfer", from: `0x${fromTopic.slice(26)}`, to: `0x${toTopic.slice(26)}`, amount });
+      }
+      const byTx = new Map<Hex, MinedLog[]>();
+      for (const l of bridgeLogs) byTx.set(l.transactionHash, [...(byTx.get(l.transactionHash) ?? []), l]);
+      for (const [txHash, txLogs] of byTx) {
+        txLogs.sort((x, y) => x.logIndex - y.logIndex);
+        const first = txLogs[0];
+        if (first === undefined) continue;
+        const at = { chain: selector, block: first.blockNumber, logIndex: first.logIndex, timestamp: await timeOf(first.blockNumber), txHash };
+        for (const adapter of adapters) {
+          for (const debit of adapter.decodeTxDebits(txLogs, selector)) {
+            debits++;
+            debitIds.add(debit.messageId.toLowerCase());
+            events.push({ ...at, kind: "debit", debit });
+          }
+          for (const credit of adapter.decodeTxCredits(txLogs, selector)) {
+            credits++;
+            const set = creditIds.get(name) ?? new Set<string>();
+            set.add(credit.messageId.toLowerCase());
+            creditIds.set(name, set);
+            events.push({ ...at, kind: "credit", credit });
+          }
         }
-        const order = ev.block * 100_000n + BigInt(ev.logIndex);
-        if (ev.kind === "Debit") {
-          debits++;
-          debitIds.add(ev.messageId.toLowerCase());
-          const debit: Debit = { messageId: ev.messageId, srcChain: selector, dstChain: ev.dstSelector, amount: ev.amount, txHash: ev.txHash, block: ev.block, ...(ev.recipient ? { recipient: ev.recipient } : {}) };
-          events.push({ kind: "debit", debit, at: ts, order });
-        } else {
-          credits++;
-          const set = creditIds.get(c.name) ?? new Set<string>();
-          set.add(ev.messageId.toLowerCase());
-          creditIds.set(c.name, set);
-          const credit: Credit = { messageId: ev.messageId, claimedSrcChain: ev.srcSelector, dstChain: selector, amount: ev.amount, txHash: ev.txHash, block: ev.block, ...(ev.recipient ? { recipient: ev.recipient } : {}) };
-          creditTx.set(`${ev.txHash}:${ev.messageId}`.toLowerCase(), { chain: c.name, hash: ev.txHash, block: ev.block.toString(), timestamp: new Date(Number(ts) * 1000).toISOString() });
-          events.push({ kind: "credit", credit, timestamp: ts, at: ts, order });
-        }
+        txRefs.set(txHash.toLowerCase(), { chain: name, hash: txHash, block: first.blockNumber.toString(), timestamp: new Date(Number(at.timestamp) * 1000).toISOString() });
       }
     }
-    const supply = await client.readContract({ address: c.token, abi: erc20Abi, functionName: "totalSupply", blockNumber: head });
-    supplies.push({ chain: selector, supply });
-    if (c.role === "home") {
-      for (const holder of [dep.escrow, dep.ccipLockBox]) {
-        if (holder) escrow += await client.readContract({ address: c.token, abi: erc20Abi, functionName: "balanceOf", args: [holder], blockNumber: head });
+    const supplyAtHead = await client.readContract({ address: tokenAddress, abi: unit.abi, functionName: unit.supply, blockNumber: head });
+    if (isHomeChain) {
+      for (const holder of holders) {
+        const balance = await client.readContract({ address: tokenAddress, abi: unit.abi, functionName: unit.balance, args: [holder], blockNumber: head });
+        escrowAtHead.push({ holder, balance });
       }
     }
-    pinned.push({ chain: selector, block: head });
-    sources.set(selector, { head, headTimestamp: headBlock.timestamp });
-    if (headBlock.timestamp > latest) latest = headBlock.timestamp;
-    coverage.push({ chain: c.name, fromBlock: from.toString(), toBlock: head.toString(), debits, credits, matched: 0 });
+    windows.push({ chain: selector, fromBlock: from, head, headTimestamp: headBlock.timestamp, supplyAtHead });
+    coverage.push({ chain: name, fromBlock: from.toString(), toBlock: head.toString(), debits, credits, matched: 0 });
   }
   for (const cov of coverage) {
     const ids = creditIds.get(cov.chain) ?? new Set<string>();
     cov.matched = [...ids].filter((id) => debitIds.has(id)).length;
   }
-  events.sort((a, b) => (a.at === b.at ? (a.order < b.order ? -1 : a.order > b.order ? 1 : 0) : a.at < b.at ? -1 : 1));
-  const history: HistoryEvent[] = events.map(({ at: _at, order: _order, ...e }) => e);
-  history.push({
-    kind: "epoch",
-    epoch: {
-      timestamp: latest,
-      sources,
-      snapshot: spec.model === "lock_release_home" ? { model: "lock_release_home", epochId: 1n, pinned, supplies, escrow } : { model: "burn_mint_multi", epochId: 1n, pinned, supplies, issuanceNet: 0n, reserve: null },
-    },
-  });
-  const result = backtest(history, spec);
-  const homeKey = spec.home.chain.name as ChainKey;
-  const homePin = pinned[0];
-  const atHome: TxRef = { chain: homeKey, hash: ZERO_HASH, block: (homePin?.block ?? 0n).toString(), timestamp: new Date(Number(latest) * 1000).toISOString() };
-  const chainOf = (sel: bigint): string => chainBySelector(sel)?.label ?? sel.toString();
+
+  let result: ReturnType<typeof replayHistory>;
+  try {
+    result = replayHistory({ chains: windows, escrowAtHead, reserve: null, events, schedule: deps.epochs ?? { kind: "supply_change" } }, spec);
+  } catch (e) {
+    // An inconsistent history (a transfer outside the window, a supply that does not add up) is a backtest failure, not a pass.
+    throw new SpecInvalidError([`history replay failed: ${e instanceof Error ? e.message : String(e)}`]);
+  }
+  const chainKeyOf = (sel: bigint): ChainKey => chainBySelector(sel)?.key ?? (spec.home.chain.name as ChainKey);
+  const refAt = (b: EpochBoundary): TxRef =>
+    (b.txHash === null ? undefined : txRefs.get(b.txHash.toLowerCase())) ?? {
+      chain: chainKeyOf(b.chain),
+      hash: b.txHash ?? ZERO_TOPIC,
+      block: b.block.toString(),
+      timestamp: new Date(Number(b.timestamp) * 1000).toISOString(),
+    };
+  const label = (sel: bigint): string => chainBySelector(sel)?.label ?? sel.toString();
+  const where = (b: EpochBoundary): string => (b.final ? "at the pinned heads" : `after block ${b.block.toString()} on ${label(b.chain)}`);
   return {
     specHash: specHash(spec),
+    // Any BROKEN anywhere in the replayed history blocks activation (6.LC3), not only one visible at head.
     ok: result.breaches.length === 0,
-    eventsReplayed: history.length - 1,
+    eventsReplayed: result.eventsReplayed,
     durationMs: Date.now() - started,
     coverage,
     breaches: result.breaches.map((b) => ({
       reason: reasonName(b.reason),
-      tx: b.credit ? (creditTx.get(`${b.credit.txHash}:${b.credit.messageId}`.toLowerCase()) ?? atHome) : atHome,
+      tx: b.credit ? (txRefs.get(b.credit.txHash.toLowerCase()) ?? refAt(b.at)) : refAt(b.at),
       amount: (b.credit ? b.credit.amount : b.delta < 0n ? -b.delta : b.delta).toString(),
-      note: b.rule === "junction" && b.credit ? `credit on ${chainOf(b.credit.dstChain)} for message ${b.credit.messageId.slice(0, 10)} has no valid debit` : `Loop Rule delta ${b.delta.toString()} at the pinned blocks`,
+      note:
+        b.rule === "junction" && b.credit
+          ? `credit on ${label(b.credit.dstChain)} for message ${b.credit.messageId.slice(0, 10)} at block ${b.credit.block.toString()} has no valid debit`
+          : `Loop Rule delta ${b.delta.toString()} at epoch ${b.epochId.toString()}, ${where(b.at)}`,
     })),
-    driftEvents: result.drift.map((d) => ({ reason: reasonName(d.reason), tx: atHome, note: d.messageId ? `message ${d.messageId.slice(0, 10)} still inside its match window` : "soft rule tripped" })),
+    driftEvents: result.drift.map((d) => ({
+      reason: reasonName(d.reason),
+      tx: refAt(d.at),
+      note: d.messageId ? `message ${d.messageId.slice(0, 10)} inside its match window ${where(d.at)}` : `soft rule tripped ${where(d.at)}`,
+    })),
   };
 }
 

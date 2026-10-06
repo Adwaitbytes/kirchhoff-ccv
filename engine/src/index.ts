@@ -80,6 +80,7 @@ export {
   CRE_LOG_QUERY_BLOCK_LIMIT,
   compileWorkflows,
   creConfidence,
+  escrowHolders,
   resolveSpec,
   type ChainDeployment,
   type CompileResult,

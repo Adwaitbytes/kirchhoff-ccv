@@ -382,7 +382,7 @@ function expectedMinters(spec: TokenSpec, chain: ChainRef, errors: string[]): He
  * ERC20LockBox behind each CCIP lock-release pool (V2 pools do not hold the
  * locked tokens themselves).
  */
-function escrowHolders(spec: TokenSpec): Hex[] {
+export function escrowHolders(spec: TokenSpec): Hex[] {
   if (spec.model !== "lock_release_home" || spec.home.escrow === null) return [];
   const holders: Hex[] = [spec.home.escrow];
   for (const bridge of spec.bridges) {
