@@ -42,6 +42,7 @@ ledgers and was last indexed at Sepolia block 11850609, before the testnet incid
 - [Reproduce the Kelp Replay](#reproduce-the-kelp-replay)
 - [Test results](#test-results)
 - [Measured latency](#measured-latency)
+- [Roadmap and business](#roadmap-and-business)
 - [Security model](#security-model)
 - [What KIRCHHOFF does not protect against](#what-kirchhoff-does-not-protect-against)
 - [Honesty notes](#honesty-notes)
@@ -424,6 +425,50 @@ Every number here was measured; the file that holds the raw output is linked.
 | Testnet `reset` (Safe resolutions, rebalance, timelock, RECOVERY_CHECK on 3 chains) | 1426.5 s, over the 3-minute target; most of it waiting for Sepolia, Arbitrum and Base finality | `demo/logs/testnet-reset0.log` |
 | Loop Rule breach to BROKEN on public testnets | pending measurement | |
 | Spec Copilot onboarding time for kETH | pending measurement | |
+
+## Roadmap and business
+
+The hackathon build is the enforcement core. PRD section 18 sets the path after TOKEN2049; nothing below is shipped
+yet unless it says so. Adoption starts in shadow mode (watch and alert, no veto) and moves to enforcement once an issuer
+has seen zero false alarms on its own traffic.
+
+| Phase | Window | Ships | Exit criteria |
+| --- | --- | --- | --- |
+| 0. Harden | Weeks 1 to 4 | Open-source engine and adapters, audit scoping, Chainlink Build application, CCV marketplace conversations | Audit firm booked, 2 issuer design partners signed |
+| 1. Shadow | Months 2 to 3 | Mainnet monitoring for 2 design partners, LayerZero and Wormhole adapters, Incident Room in production | 60 days with zero false BROKEN on real traffic |
+| 2. Enforce | Months 4 to 6 | 4-cell committee across independent operators, CCV marketplace listing, first enforced token | First token requiring the KIRCHHOFF CCV on mainnet lanes |
+| 3. Feed | Months 6 to 9 | Conservation Feed integrated by lending markets and vault curators | 3 money markets reading the feed |
+| 4. Institutional | Months 9 to 12 | Tokenized funds and deposits on CCIP 2.0 across public and private chains, dedicated cells for regulated issuers | First institutional issuer |
+
+Bridge coverage grows by adapter: `layerzero_oft` (cut from the hackathon, required for v1), `wormhole_ntt`,
+`op_standard_bridge` and `arbitrum_gateway` (long withdrawal windows through `maxDeliverySeconds`), and `issuer_mint`
+for burn-and-mint tokens. Every adapter maps its events onto the engine's Debit and Credit shapes
+(`engine/src/adapters`), so a new bridge is an adapter plus a backtest, not a new engine.
+
+### Revenue lines (a hypothesis to validate with design partners)
+
+| Line | Who pays | How |
+| --- | --- | --- |
+| CCV verification fee | Users of protected tokens, collected by CCIP | CCIP 2.0 lets third-party verifiers set their own fee on top of the base fee |
+| Issuer subscription | Token issuers | Monitoring, Incident Room, Spec Copilot, backtests, on-call integrations |
+| Feed SLA | Lending markets, curators | Public feed free; paid tier with SLA and support |
+| Dedicated cells | Institutions | We operate isolated cells or license the Judge to their own operators |
+
+### Where we sit
+
+| Alternative | What it does | Why KIRCHHOFF is different |
+| --- | --- | --- |
+| CCIP Committee Verifier | Verifies message authenticity | We add an independent economic check and sit beside it, by design |
+| Issuer-built CCVs | One issuer's own logic | A reusable product across issuers and bridges |
+| Infra firms running CCVs | Operate verifiers for clients | Likely partners: they can run cells with our Judge |
+| Other bridges' verifier networks | Check signatures on their own messages | Cannot see supply created on other bridges |
+| Runtime monitoring firms | Alert on suspicious activity | Alerts do not veto; we refuse to sign |
+| Chainlink Proof of Reserve | Proves reserves exist | Does not match credits to debits; W2 consumes it for backed tokens |
+
+Go-to-market: first customers are issuers whose tokens move across many bridges and chains (LRTs, LSTs, wrapped BTC,
+multi-chain stablecoins); the channel is Chainlink's CCV marketplace, audit firms and risk curators who require the
+feed; the wedge is free shadow-mode monitoring with a public status page. The moat is the adapter library and backtest
+corpus, the per-token zero-false-positive record, and the network effect of lending markets reading the feed.
 
 ## Security model
 
