@@ -46,7 +46,10 @@ const debitLookup = pairedWatch.extend({
 const header = { token: z.string().min(1), tokenId: bytes32, specHash: bytes32 };
 
 const chainRef = z.object({ name: z.string().min(1), selector: uintString, alias: z.string().min(1) });
-const fieldMap = z.object({ messageId: z.string(), amount: z.string(), recipient: z.string().nullable(), remoteChain: z.string() });
+// `shares` names the share-amount event field for `unit: shares` tokens; zod would otherwise strip it silently.
+const fieldMap = z
+  .object({ messageId: z.string(), amount: z.string(), recipient: z.string().nullable(), remoteChain: z.string(), shares: z.string().optional() })
+  .transform(({ shares, ...rest }) => (shares === undefined ? rest : { ...rest, shares }));
 const addressMap = z.record(z.string(), address).readonly();
 const bridge = z.discriminatedUnion("kind", [
   z.object({

@@ -112,6 +112,19 @@ describe("generated configs", () => {
     expect(w4ConfigSchema.parse(c.w4)).toEqual(c.w4);
   });
 
+  it("keep a bridge's shares field for unit: shares tokens instead of stripping it", async () => {
+    const c = await compiledConfigs();
+    const custom = (cfg: typeof c.w1) => cfg.spec.bridges.find((b) => b.kind === "custom");
+    const withShares = structuredClone(c.w1);
+    const bridge = custom(withShares);
+    if (bridge?.kind !== "custom") throw new Error("compiled W1 config has no custom bridge");
+    bridge.events.creditFields = { ...bridge.events.creditFields, shares: "sharesValue" };
+    const parsed = custom(w1ConfigSchema.parse(withShares));
+    expect(parsed?.kind === "custom" ? parsed.events.creditFields : null).toMatchObject({ shares: "sharesValue" });
+    const plain = custom(w1ConfigSchema.parse(c.w1));
+    expect(plain?.kind === "custom" ? plain.events.creditFields : null).not.toHaveProperty("shares");
+  });
+
   it("reject a config with a malformed address", async () => {
     const c = await compiledConfigs();
     expect(() => w3ConfigSchema.parse({ ...c.w3, breachTrigger: { ...c.w3.breachTrigger, address: "0x1234" } })).toThrow();
