@@ -21,6 +21,12 @@ export type JudgeVerdictReport = {
   receiver: string;
   token: string | null;
   sourceTxHash: string | null;
+  /** Hook provenance forwarded by the Judge; null when the verifier did not send it. */
+  sourceBlock: string | null;
+  sourceBlockTimestamp: string | null;
+  finality: { mode: "blockDepth" | "finalized"; blockDepth: number; safe: boolean } | null;
+  feeToken: string | null;
+  feeTokenAmount: string | null;
 };
 
 export class VerdictValidationError extends Error {
@@ -69,6 +75,11 @@ export function parseVerdictReport(input: unknown): JudgeVerdictReport {
   if (token === undefined) throw new VerdictValidationError("token must be a symbol");
   const sourceTxHash = o.sourceTxHash === undefined || o.sourceTxHash === null ? null : typeof o.sourceTxHash === "string" && HEX32.test(o.sourceTxHash) ? o.sourceTxHash.toLowerCase() : undefined;
   if (sourceTxHash === undefined) throw new VerdictValidationError("sourceTxHash must be bytes32 hex");
+  const sourceBlock = optional(o.sourceBlock, (v) => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? String(v) : undefined), "sourceBlock must be a block number");
+  const sourceBlockTimestamp = optional(o.sourceBlockTimestamp, (v) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : undefined), "sourceBlockTimestamp must be ISO-8601");
+  const finality = optional(o.finality, parseFinality, "finality must be {mode, blockDepth, safe}");
+  const feeToken = optional(o.feeToken, (v) => (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v) ? v.toLowerCase() : undefined), "feeToken must be an address");
+  const feeTokenAmount = optional(o.feeTokenAmount, (v) => (typeof v === "string" && UINT.test(v) ? v : undefined), "feeTokenAmount must be a base-unit decimal string");
   return {
     cellId: o.cellId,
     messageId: o.messageId.toLowerCase(),
@@ -84,7 +95,27 @@ export function parseVerdictReport(input: unknown): JudgeVerdictReport {
     receiver: address(o.receiver, "receiver"),
     token,
     sourceTxHash,
+    sourceBlock,
+    sourceBlockTimestamp,
+    finality,
+    feeToken,
+    feeTokenAmount,
   };
+}
+
+/** Absent or null means "not sent"; a present but malformed value is rejected rather than silently dropped. */
+function optional<T>(value: unknown, parse: (v: unknown) => T | undefined, message: string): T | null {
+  if (value === undefined || value === null) return null;
+  const parsed = parse(value);
+  if (parsed === undefined) throw new VerdictValidationError(message);
+  return parsed;
+}
+
+function parseFinality(v: unknown): { mode: "blockDepth" | "finalized"; blockDepth: number; safe: boolean } | undefined {
+  if (typeof v !== "object" || v === null) return undefined;
+  const f = v as Record<string, unknown>;
+  if ((f.mode !== "blockDepth" && f.mode !== "finalized") || typeof f.blockDepth !== "number" || !Number.isInteger(f.blockDepth) || f.blockDepth < 0 || typeof f.safe !== "boolean") return undefined;
+  return { mode: f.mode, blockDepth: f.blockDepth, safe: f.safe };
 }
 
 const STATUS_REASONS: readonly ReasonCode[] = ["TOKEN_BROKEN", "TOKEN_QUARANTINED", "TOKEN_RECOVERING"];
@@ -99,8 +130,9 @@ export async function ingestVerdict(db: Db, report: JudgeVerdictReport, defaultT
   const symbol = report.token ?? defaultToken;
   return withTransaction(db, async (client) => {
     const ins = await client.query(
-      `insert into judge_verdicts (cell_id, message_id, token_symbol, decision, reason, note, latency_ms, src_chain, dst_chain, amount, sender, receiver, source_tx, evaluated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      `insert into judge_verdicts (cell_id, message_id, token_symbol, decision, reason, note, latency_ms, src_chain, dst_chain, amount, sender, receiver, source_tx, evaluated_at,
+         source_block, source_block_timestamp, finality_mode, finality_block_depth, finality_safe, fee_token, fee_token_amount)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        on conflict (cell_id, message_id, decision) do update set reason = excluded.reason, note = excluded.note, latency_ms = excluded.latency_ms,
          evaluated_at = excluded.evaluated_at, received_at = now()`,
       [
@@ -118,6 +150,13 @@ export async function ingestVerdict(db: Db, report: JudgeVerdictReport, defaultT
         report.receiver,
         report.sourceTxHash,
         report.evaluatedAt,
+        report.sourceBlock,
+        report.sourceBlockTimestamp,
+        report.finality?.mode ?? null,
+        report.finality?.blockDepth ?? null,
+        report.finality?.safe ?? null,
+        report.feeToken,
+        report.feeTokenAmount,
       ],
     );
     if (report.decision === "PENDING") return { stored: (ins.rowCount ?? 0) > 0 };

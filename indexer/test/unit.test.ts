@@ -43,6 +43,28 @@ describe("Judge verdict sink", () => {
     }
   });
 
+  it("keeps the hook provenance the Judge forwards and rejects malformed values", () => {
+    expect(parseVerdictReport(base)).toMatchObject({ sourceBlock: null, sourceBlockTimestamp: null, finality: null, feeToken: null, feeTokenAmount: null });
+    const full = parseVerdictReport({
+      ...base,
+      sourceBlock: 11855001,
+      sourceBlockTimestamp: "2026-10-06T12:00:00Z",
+      finality: { mode: "finalized", blockDepth: 0, safe: false },
+      feeToken: `0x${"EE".repeat(20)}`,
+      feeTokenAmount: "1234500000000000",
+    });
+    expect(full).toMatchObject({
+      sourceBlock: "11855001",
+      sourceBlockTimestamp: "2026-10-06T12:00:00.000Z",
+      finality: { mode: "finalized", blockDepth: 0, safe: false },
+      feeToken: `0x${"ee".repeat(20)}`,
+      feeTokenAmount: "1234500000000000",
+    });
+    for (const bad of [{ sourceBlock: -1 }, { sourceBlockTimestamp: "yesterday" }, { finality: { mode: "soon", blockDepth: 1, safe: true } }, { feeToken: "0x12" }, { feeTokenAmount: "1.5" }]) {
+      expect(() => parseVerdictReport({ ...base, ...bad })).toThrow(VerdictValidationError);
+    }
+  });
+
   it("builds the committee row: PENDING is stored raw but never shown; any FAIL makes the row FAIL", async () => {
     await db.query("insert into tokens (symbol, token_id, name, decimals, model, home_chain, chains, spec_yaml, config) values ('kETH','0x01','k',18,'lock_release_home','ethereum-testnet-sepolia','{}','', '{}')");
     await ingestVerdict(db, parseVerdictReport({ ...base, decision: "PENDING", reason: "PENDING_ATTESTATION" }), "kETH");
