@@ -138,6 +138,11 @@ export async function sendRaw(
   const costWei = receipt.gasUsed * receipt.effectiveGasPrice;
   log(`${chain.config.label}: ${label} ${hash} gas=${receipt.gasUsed} cost=${formatEther(costWei)} ETH ${receipt.status}`);
   if (receipt.status !== "success" && tx.gas === undefined) throw new TxError(`${label} reverted onchain: ${hash}`);
+  // Public RPCs load-balance across nodes: the next read or simulation can land on a node behind the receipt's block
+  // and miss this write (seen on Base Sepolia). Return only once the read client has reached that block.
+  for (let i = 0; i < 30 && (await chain.client.getBlockNumber({ cacheTime: 0 })) < receipt.blockNumber; i++) {
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
   return { hash, receipt, url: txUrl(chain.config, hash), costWei };
 }
 
