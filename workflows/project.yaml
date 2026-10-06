@@ -1,0 +1,52 @@
+# KIRCHHOFF CRE project. Targets are named exactly `local` and `staging` so the PRD commands work verbatim:
+#   cre workflow simulate ./w2-loop --target staging -e ../.env
+#
+# local: the three Anvil chains from demo/anvil-up.sh (home 8545 / 31337, arb 8546 / 31338, base 8547 / 31339).
+#   Loopback http RPCs are allowed without --allow-insecure-rpc. Each Anvil chain stands in for the public testnet
+#   with the same CCIP chain selector (docs/INTERFACES.md), so no experimental-chains entry is needed: the simulator
+#   only reads the chain id for its health check, and scripts/scenarios.ts installs our MockKeystoneForwarder
+#   bytecode (contracts/src/demo/MockKeystoneForwarder.sol) at the simulator's built-in mock forwarder address on each
+#   chain (docs/research/cre.md section 3), plus canonical Multicall3 at 0xcA11...CA11.
+# staging: the public testnets. RPC URLs come from the repo .env (RPC_*_1, provider 1), never from this file.
+local:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: http://127.0.0.1:8545
+    - chain-name: ethereum-testnet-sepolia-arbitrum-1
+      url: http://127.0.0.1:8546
+    - chain-name: ethereum-testnet-sepolia-base-1
+      url: http://127.0.0.1:8547
+
+# scenarios: three private Anvil chains (18545-18547, same chain ids and selectors as local) that
+#   scripts/scenarios.ts starts and stops itself, so the scripted scenarios never share chains, nonces, mined blocks
+#   or evm_increaseTime with demo/ runs on the shared local chains.
+scenarios:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: http://127.0.0.1:18545
+    - chain-name: ethereum-testnet-sepolia-arbitrum-1
+      url: http://127.0.0.1:18546
+    - chain-name: ethereum-testnet-sepolia-base-1
+      url: http://127.0.0.1:18547
+
+staging:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: ${RPC_ETH_SEPOLIA_1}
+    - chain-name: ethereum-testnet-sepolia-arbitrum-1
+      url: ${RPC_ARB_SEPOLIA_1}
+    - chain-name: ethereum-testnet-sepolia-base-1
+      url: ${RPC_BASE_SEPOLIA_1}
+
+# staging-fallback: the same public testnets with Sepolia and Base on provider 2 (RPC_*_2). scripts/runner.ts
+# switches to it when provider 1 keeps answering 429. Arbitrum Sepolia stays on provider 1: W2 reads at the
+# finalized pin, ~4,000 Arbitrum blocks back, and publicnode answers "historical state ... is not available" there
+# (checked 2026-10-06; it serves Sepolia's 76-block and Base's 540-block finalized lag). Configs are the staging ones.
+staging-fallback:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: ${RPC_ETH_SEPOLIA_2}
+    - chain-name: ethereum-testnet-sepolia-arbitrum-1
+      url: ${RPC_ARB_SEPOLIA_1}
+    - chain-name: ethereum-testnet-sepolia-base-1
+      url: ${RPC_BASE_SEPOLIA_2}
