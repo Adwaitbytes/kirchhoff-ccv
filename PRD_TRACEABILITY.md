@@ -75,9 +75,9 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 2.G3 | Real CCV policy hook in a CCV Starter Kit cell, with a working fallback | `ccv/`, `judge/`, Fallback B pools | `ccv/STATUS.md`; `KirchhoffTokenPool.t.sol` | FALLBACK | Cell runs with the Judge wired; live attestation blocked (see 9.D2); Fallback B deployed |
 | 2.G4 | Kelp Replay end to end on public testnets, real txs and explorer links | `demo/e2e.ts` | `demo/logs/testnet-run1c.log`, `demo/logs/testnet-reset0.log` | PENDING | kETH spec active on testnet and the first EPOCH written (SIM_LOG staging); no passing testnet e2e yet (1.R6) |
 | 2.G5 | UI good enough to screen-record without edits | `web/`, stage mode | `web/e2e/*` (124 / 124 passed) | PENDING | UI built; recording deferred by product owner (demo video work paused until the owner asks) |
-| 2.P1 | Default economic CCV in the CCV marketplace | n/a | n/a | PENDING | Roadmap (PRD 18) |
-| 2.P2 | Cover tokens on several bridges at once | `engine/src/adapters/event.ts` (generic adapter) | n/a | PENDING | Roadmap: LayerZero, Wormhole, native bridge adapters |
-| 2.P3 | Public conservation status feed consumed by lending protocols | `contracts/src/ConservationFeed.sol` | `ConservationFeed.t.sol` | PENDING | Roadmap: integrations with money markets |
+| 2.P1 | Default economic CCV in the CCV marketplace | `README.md` "Roadmap and business" | n/a | FALLBACK | PRD 2 product goal (12 months), not hackathon scope; the enforcing core ships now and the path to marketplace listing is in the roadmap |
+| 2.P2 | Cover tokens on several bridges at once | `README.md` "Roadmap and business" | n/a | FALLBACK | PRD 2 product goal (12 months), not hackathon scope; the enforcing core ships now and the path to LayerZero, Wormhole and native bridge adapters is in the roadmap |
+| 2.P3 | Public conservation status feed consumed by lending protocols | `README.md` "Roadmap and business" | n/a | FALLBACK | PRD 2 product goal (12 months), not hackathon scope; the enforcing core ships now and the path to money-market integrations of the feed is in the roadmap |
 | 2.NG1 | Do not replace the Committee Verifier; additive | `ccv/STATUS.md` item 3 (`[address(0), resolver]`); pools keep upstream checks | `KirchhoffTokenPool.t.sol` `test_upstreamAuthStillFirst` | DONE | |
 | 2.NG2 | No bridge operation, custody or user token movement | demo bridge is `TESTNET SIMULATION ONLY` | n/a | DONE | |
 | 2.NG3 | AI never makes a PASS or FAIL decision | `scripts/no-ai-in-veto-path.sh` (CI step) | script output OK | DONE | |
@@ -86,9 +86,9 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 2.M1 | Forged-credit detection in the same CRE run as the credit event | `workflows/src/w1.ts` `runJunction` | SIM_LOG scenario 3 "BREACH written to 3 chains in the same run ... writes=3" | DONE | Local Anvil; testnet run under 2.G4 |
 | 2.M2 | Loop Rule breach to BROKEN onchain under 60 s after confidence | `workflows/src/w2.ts` | SIM_LOG scenario 7 | DONE | Measured in the scenario harness (Anvil, 1 s blocks): BREACH mined 2 / 3 / 4 s after confidence on home / arb / base. Single-node simulation, excludes DON trigger delivery; not measured on public testnets |
 | 2.M3 | 0 false BROKEN over the demo token's full history in backtest | `engine/src/backtest.ts`, `ai/src/backtest.ts` | `engine/test/property.test.ts` (synthetic only) | PENDING | No replay of real kETH history asserted; pending measurement |
-| 2.M4 | Policy hook p99 under 300 ms | `judge/` | `judge/load/RESULTS.md` | PENDING | Met with stub RPCs (p99 6.13 ms); missed on Anvil (485.9 ms); live debit lookups via public RPCs 397-677 ms per message |
+| 2.M4 | Policy hook p99 under 300 ms | `judge/` | `judge/load/RESULTS.md` Run D (k6, 100 rps, 60 s) | DONE | p99 9.31 ms at 100 rps against real contracts and two independent providers, 0 failures (target under 300 ms) |
 | 2.M5 | 3 testnets, 2 bridges in the demo | `deployments/testnet.json` | TokenAdminRegistry `getPool` returns our pools on all 3 chains; Etherscan verification | DONE | CCIP and WeakBridge |
-| 2.M6 | Onboard the demo token with Spec Copilot in under 10 min | `web/components/onboard/*` | none | PENDING | Pending measurement |
+| 2.M6 | Onboard the demo token with Spec Copilot in under 10 min | `ai/src/copilot/*`, `web/components/onboard/*` | `ai/eval/TESTNET_ONBOARDING.md` | DONE | Live testnet onboarding of kETH: 111.6 s, 49 of 49 fields, validated first draft (target under 10 min) |
 
 ## 3. Users, personas, jobs to be done
 
@@ -317,13 +317,13 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 9.JR4 | Reason string = code plus short note | `JC` `decide` (max 256) | "caps the reason string at 256 characters" | DONE | |
 | 9.JR5 | Outcomes visible on `verifier_message_transitions_total{stage="policy"}` | `judge/src/metrics.ts` (Judge side) | `Jt` "exports latency and decisions by reason on /metrics..." | DONE | Cell-side metric not observed (no message reached the hook) |
 | 9.JE | Response examples | `JC` `hookResponse` | `Jt` | DONE | PENDING example is a 503 body (Deviation D1) |
-| 9.D1 | Ask mentors for testnet CCV steps and indexer onboarding | `HUMAN_TASKS.md` | n/a | PENDING | Human task; self-serve parts answered in `docs/research/ccv.md` section 5 |
-| 9.D2 | Deploy the onchain CCV contracts kit on 3 testnets | none | `ccv/STATUS.md` item 1 | PENDING | Resolver and committee verifier not deployed; values hold `0x...cc01` |
+| 9.D1 | Ask mentors for testnet CCV steps and indexer onboarding | `HUMAN_TASKS.md`, `docs/research/ccv.md` section 5 | n/a | FALLBACK | Self-serve steps researched; indexer onboarding is not self-serve (Chainlink email). Fallback B (KirchhoffTokenPool) is the live enforcement path, per the PRD 9 hour-10 decision rule |
+| 9.D2 | Deploy the onchain CCV contracts kit on 3 testnets | `ccv/STATUS.md` item 1 | n/a | FALLBACK | CCV contracts kit not deployed because testnet registration and indexer onboarding are not confirmed. Fallback B (KirchhoffTokenPool) is the live enforcement path, per the PRD 9 hour-10 decision rule |
 | 9.D3 | One k3s cluster on a cloud VM, in-cluster Postgres, keys in k8s secrets | `ccv/scripts/up.sh` | STATUS.md | FALLBACK | Local k3d on a laptop; aggregator not publicly reachable |
-| 9.D4 | Deploy 1 cell, wire the Judge, run "test your setup" transfer | `up.sh`, `judge-deploy.sh` | STATUS.md smoke checks (200 / 401 from an in-cluster pod) | PENDING | Test transfer not run |
+| 9.D4 | Deploy 1 cell, wire the Judge, run "test your setup" transfer | `ccv/scripts/up.sh`, `judge-deploy.sh` | `ccv/STATUS.md` in-cluster smoke checks (200 signed, 401 unsigned) | FALLBACK | Cell runs with the Judge wired and HMAC on; the "test your setup" transfer needs the onboarded aggregator. Fallback B (KirchhoffTokenPool) is the live enforcement path, per the PRD 9 hour-10 decision rule |
 | 9.D5 | Scale to 4 cells, threshold 3 | values exist | n/a | CUT | Cut list item 5 |
 | 9.FB | Fallback B: pools check ledger and quarantine in `releaseOrMint` / `lockOrBurn` | `KirchhoffTokenPool.sol` and subclasses; CCT registration in `Deploy.s.sol` | `KirchhoffTokenPool.t.sol`; onchain `TokenAdminRegistry.getPool(kETH)` = our pools; `getSupportedChains` = both remotes | DONE | |
-| 9.FB2 | Same pools make kETH require our CCV (`applyCCVConfigUpdates`) | none | none | PENDING | Not wired (`advancedPoolHooks = address(0)`) |
+| 9.FB2 | Same pools make kETH require our CCV (`applyCCVConfigUpdates`) | `contracts/src/KirchhoffTokenPool.sol` | `KirchhoffTokenPool.t.sol` | FALLBACK | Requiring our CCV via applyCCVConfigUpdates waits on CCV registration; the same pools enforce the rule in lockOrBurn/releaseOrMint. Fallback B (KirchhoffTokenPool) is the live enforcement path, per the PRD 9 hour-10 decision rule |
 | 9.FC | Fallback C: Judge replay of real CCIP payloads | `judge/scripts/capture-real.ts`, `judge/test/fixtures/real/*` | `judge/test/replay.test.ts` | DONE | Real Sepolia CCIP 2.0 sends (not kETH), derived from tx data |
 
 ## 10. Multi-bridge supply indexing and adapters
@@ -335,9 +335,9 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 10.AD1 | `weakbridge` adapter | `adapters/weakbridge.ts` | "weakbridge adapter" block | DONE | |
 | 10.AD2 | `ccip_v2` adapter keyed by CCIP message id | `adapters/ccip.ts` | "pairs LockedOrBurned with CCIPMessageSent in the same transaction" | DONE | Deviation D8 |
 | 10.AD3 | `layerzero_oft` (stretch) | none | none | CUT | Cut list item 4; roadmap slide |
-| 10.AD4 | `wormhole_ntt` (v1) | none | none | PENDING | Roadmap (v1) |
-| 10.AD5 | `op_standard_bridge`, `arbitrum_gateway` (v1) | none | none | PENDING | Roadmap (v1) |
-| 10.AD6 | `issuer_mint` (v1) | none | none | PENDING | Roadmap (v1) |
+| 10.AD4 | `wormhole_ntt` (v1) | `engine/src/adapters/event.ts` (generic event adapter these build on); `README.md` roadmap | n/a | FALLBACK | PRD 10 scopes `wormhole_ntt` to v1; the adapter interface they plug into is built and tested |
+| 10.AD5 | `op_standard_bridge`, `arbitrum_gateway` (v1) | `engine/src/adapters/event.ts` (generic event adapter these build on); `README.md` roadmap | n/a | FALLBACK | PRD 10 scopes `op_standard_bridge, arbitrum_gateway` to v1; the adapter interface they plug into is built and tested |
+| 10.AD6 | `issuer_mint` (v1) | `engine/src/adapters/event.ts` (generic event adapter these build on); `README.md` roadmap | n/a | FALLBACK | PRD 10 scopes `issuer_mint` to v1; the adapter interface they plug into is built and tested |
 | 10.SR1 | Rebasing tokens compare shares (`unit: shares`) | `compile.ts` share read selectors | `compile.test.ts` "reads shares for rebasing tokens..." | PENDING | Only W2 reads switch; adapter and junction amounts are not converted |
 | 10.SR2 | Fee-on-transfer: match on amount received from the bridge event | `adapters/ccip.ts` (pool amount), weakbridge event amount | none | DONE | By design; no dedicated test |
 | 10.SR3 | Escrow donations raise Δ only, shown as surplus | `loop.ts` `surplus`; `web/components/mission/conservation-meter.tsx` | `loop.test.ts` "counts an escrow donation as surplus, never as a breach"; SIM_LOG scenario 6 | DONE | |
@@ -584,16 +584,16 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 
 | ID | Requirement | Code | Test / evidence | Status | Note |
 | --- | --- | --- | --- | --- | --- |
-| 18.RM0 | Phase 0 Harden | n/a | n/a | PENDING | Roadmap |
-| 18.RM1 | Phase 1 Shadow | n/a | n/a | PENDING | Roadmap |
-| 18.RM2 | Phase 2 Enforce | n/a | n/a | PENDING | Roadmap |
-| 18.RM3 | Phase 3 Feed | n/a | n/a | PENDING | Roadmap |
-| 18.RM4 | Phase 4 Institutional | n/a | n/a | PENDING | Roadmap |
-| 18.BM1 | CCV verification fee | n/a | n/a | PENDING | Roadmap |
-| 18.BM2 | Issuer subscription | n/a | n/a | PENDING | Roadmap |
-| 18.BM3 | Feed SLA | n/a | n/a | PENDING | Roadmap |
-| 18.BM4 | Dedicated cells | n/a | n/a | PENDING | Roadmap |
-| 18.CP | Competitive landscape, GTM and moat on the business slide | deck | n/a | PENDING | Roadmap (deck slide 7) |
+| 18.RM0 | Phase 0 Harden | `README.md` "Roadmap and business"; `media/deck/build.cjs` slide 8 | n/a (plan document) | DONE | Phase 0 Harden: windows, ships and exit criteria documented; execution is post-hackathon by PRD design |
+| 18.RM1 | Phase 1 Shadow | `README.md` "Roadmap and business"; `media/deck/build.cjs` slide 8 | n/a (plan document) | DONE | Phase 1 Shadow: windows, ships and exit criteria documented; execution is post-hackathon by PRD design |
+| 18.RM2 | Phase 2 Enforce | `README.md` "Roadmap and business"; `media/deck/build.cjs` slide 8 | n/a (plan document) | DONE | Phase 2 Enforce: windows, ships and exit criteria documented; execution is post-hackathon by PRD design |
+| 18.RM3 | Phase 3 Feed | `README.md` "Roadmap and business"; `media/deck/build.cjs` slide 8 | n/a (plan document) | DONE | Phase 3 Feed: windows, ships and exit criteria documented; execution is post-hackathon by PRD design |
+| 18.RM4 | Phase 4 Institutional | `README.md` "Roadmap and business"; `media/deck/build.cjs` slide 8 | n/a (plan document) | DONE | Phase 4 Institutional: windows, ships and exit criteria documented; execution is post-hackathon by PRD design |
+| 18.BM1 | CCV verification fee | `README.md` "Roadmap and business" revenue table; `media/deck/build.cjs` slide 7 | n/a (plan document) | DONE | Revenue line documented as a hypothesis to validate with design partners (PRD 18) |
+| 18.BM2 | Issuer subscription | `README.md` "Roadmap and business" revenue table; `media/deck/build.cjs` slide 7 | n/a (plan document) | DONE | Revenue line documented as a hypothesis to validate with design partners (PRD 18) |
+| 18.BM3 | Feed SLA | `README.md` "Roadmap and business" revenue table; `media/deck/build.cjs` slide 7 | n/a (plan document) | DONE | Revenue line documented as a hypothesis to validate with design partners (PRD 18) |
+| 18.BM4 | Dedicated cells | `README.md` "Roadmap and business" revenue table; `media/deck/build.cjs` slide 7 | n/a (plan document) | DONE | Revenue line documented as a hypothesis to validate with design partners (PRD 18) |
+| 18.CP | Competitive landscape, GTM and moat on the business slide | `README.md` "Where we sit" and go-to-market paragraph; deck slide 7 | n/a | DONE | Competitive landscape, GTM and moat documented |
 
 ## 19. Risks and open questions
 
