@@ -40,7 +40,9 @@ export function DeltaHistory({ epochs, decimals, symbol, view }: { epochs: Epoch
   const min = Math.min(0, ...data.map((d) => d.delta));
   const max = Math.max(0, ...data.map((d) => d.delta));
   const span = max - min;
-  const zeroOffset = span === 0 ? 1 : max / span;
+  // Δ = 0 is conserved, so the color boundary sits just below the zero line; at exactly max / span the stops tie
+  // and a flat zero stretch (max = 0 when Δ never goes positive) would paint in the breach color.
+  const zeroOffset = span === 0 ? 1 : Math.min(1, max / span + 0.01);
   const pad = span === 0 ? 2 : span * 0.12;
   const step = span === 0 ? 1 : 10 ** Math.floor(Math.log10(span)) / 2;
   const lo = span === 0 ? -2 : Math.floor((min - pad) / step) * step;
