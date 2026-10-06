@@ -554,6 +554,34 @@ export interface CheckTransferResponse extends MirrorMeta {
 }
 
 /* ----------------------------------------------------------------------------------------------
+ * POST /subscriptions and DELETE /subscriptions (public, rate-limited)
+ * A holder subscribes a Telegram chat to a token's status (PRD section 3, nice-to-have 2). Both
+ * methods take the same body; both are idempotent.
+ * -------------------------------------------------------------------------------------------- */
+
+export interface SubscriptionRequest {
+  /** A protected token symbol, e.g. "kETH". */
+  token: string;
+  /** Numeric Telegram chat id as a string (groups are negative), or a public "@channel" handle. */
+  telegramChatId: string;
+}
+
+export interface SubscriptionResponse extends MirrorMeta {
+  /** Canonical token symbol. */
+  token: string;
+  channel: "telegram";
+  telegramChatId: string;
+  /** False after DELETE. */
+  active: boolean;
+  /** Null when DELETE found no subscription. */
+  createdAt: IsoTime | null;
+  /** "disabled" when this deployment has no Telegram bot configured: stored, but no alerts are sent. */
+  delivery: "enabled" | "disabled";
+  /** Public status page linked from every alert, null when the deployment has no public web URL. */
+  statusPageUrl: string | null;
+}
+
+/* ----------------------------------------------------------------------------------------------
  * POST /specs/draft (issuer key, Server-Sent Events)
  * -------------------------------------------------------------------------------------------- */
 
