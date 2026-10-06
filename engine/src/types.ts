@@ -118,6 +118,12 @@ export type EventFieldMap = {
   recipient: string | null;
   /** Debit: destination selector parameter. Credit: claimed source selector parameter. */
   remoteChain: string;
+  /**
+   * uint256 parameter carrying the share amount. Required on both sides for a
+   * `unit: shares` token, whose Junction and Loop compare shares, not balances
+   * (PRD section 10); omitted otherwise, which keeps existing spec hashes.
+   */
+  shares?: string;
 };
 
 export type BridgeEvents = {

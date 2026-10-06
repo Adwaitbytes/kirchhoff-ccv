@@ -20,6 +20,7 @@ const FIELD_TYPES: Record<keyof EventFieldMap, readonly string[]> = {
   amount: ["uint256"],
   recipient: ["address"],
   remoteChain: ["uint64"],
+  shares: ["uint256"],
 };
 
 /** Parses a spec event signature such as `Burned(bytes32 indexed id, ...)` and checks the field map against it. */
@@ -30,9 +31,9 @@ export function parseBridgeEvent(signature: string, fields: EventFieldMap): Pars
   } catch (cause) {
     throw new EngineInputError(`invalid event signature "${signature}"`, { cause });
   }
-  for (const key of ["messageId", "amount", "recipient", "remoteChain"] as const) {
+  for (const key of ["messageId", "amount", "recipient", "remoteChain", "shares"] as const) {
     const name = fields[key];
-    if (name === null) continue;
+    if (name === null || name === undefined) continue;
     const input = abi.inputs.find((i) => i.name === name);
     if (input === undefined || !FIELD_TYPES[key].includes(input.type)) {
       throw new EngineInputError(`event ${abi.name} needs a ${FIELD_TYPES[key].join("|")} parameter "${name}" for ${key}`);
@@ -85,6 +86,19 @@ function findBridge(spec: TokenSpec, bridgeId: string): BridgeSpec {
   return bridge;
 }
 
+/**
+ * The event parameter the engine reads as the amount. A `unit: shares` token is
+ * compared in shares end to end (PRD section 10), so its bridge events must name
+ * the share amount; a balance would drift with every rebase.
+ */
+export function amountField(spec: TokenSpec, bridgeId: string, side: "debit" | "credit", fields: EventFieldMap): string {
+  if (spec.unit === "tokens") return fields.amount;
+  if (fields.shares === undefined) {
+    throw new EngineInputError(`bridge ${bridgeId}: unit shares needs a shares field on the ${side} event`);
+  }
+  return fields.shares;
+}
+
 type DecodedArgs = Readonly<Record<string, unknown>>;
 
 function decodeArgs(event: ParsedEvent, log: Log): DecodedArgs | null {
@@ -134,6 +148,8 @@ export function createEventAdapter(options: EventAdapterOptions): BridgeAdapter 
   const bridge = findBridge(spec, bridgeId);
   const debit = parseBridgeEvent(options.events.debitEvent, options.events.debitFields);
   const credit = parseBridgeEvent(options.events.creditEvent, options.events.creditFields);
+  const debitAmount = amountField(spec, bridgeId, "debit", debit.fields);
+  const creditAmount = amountField(spec, bridgeId, "credit", credit.fields);
   const topicIndex = messageIdTopic(debit);
   if (messageIdTopic(credit) !== topicIndex) {
     throw new EngineInputError(`bridge ${bridgeId}: debit and credit must carry the message id in the same topic`);
@@ -162,7 +178,7 @@ export function createEventAdapter(options: EventAdapterOptions): BridgeAdapter 
         messageId: hexArg(args, debit.fields.messageId),
         srcChain: chain,
         dstChain: bigintArg(args, debit.fields.remoteChain),
-        amount: bigintArg(args, debit.fields.amount),
+        amount: bigintArg(args, debitAmount),
         ...recipientOf(args, debit.fields),
         txHash: log.transactionHash,
         block: log.blockNumber,
@@ -176,7 +192,7 @@ export function createEventAdapter(options: EventAdapterOptions): BridgeAdapter 
         messageId: hexArg(args, credit.fields.messageId),
         claimedSrcChain: bigintArg(args, credit.fields.remoteChain),
         dstChain: chain,
-        amount: bigintArg(args, credit.fields.amount),
+        amount: bigintArg(args, creditAmount),
         ...recipientOf(args, credit.fields),
         txHash: log.transactionHash,
         block: log.blockNumber,

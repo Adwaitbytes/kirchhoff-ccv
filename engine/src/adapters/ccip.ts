@@ -100,6 +100,10 @@ function ccipBridge(spec: TokenSpec, bridgeId: string): CcipBridgeSpec {
  */
 export function createCcipV2Adapter(spec: TokenSpec, bridgeId = "ccip"): BridgeAdapter {
   const bridge = ccipBridge(spec, bridgeId);
+  if (spec.unit === "shares") {
+    // Pool events carry balances; converting them needs the share rate at each block, which a pure adapter cannot read.
+    throw new EngineInputError(`bridge ${bridgeId}: CCIP 2.0.0 pool events carry balances, not shares, so unit shares cannot use ccip_v2`);
+  }
   const has = (s: TokenSpec, chain: ChainSel, map: "onramps" | "offramps"): boolean => {
     const b = s.bridges.find((x) => x.id === bridgeId);
     return b?.kind === "ccip_v2" && addressOn(s, b[map], chain) !== null;

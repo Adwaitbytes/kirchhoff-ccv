@@ -1,4 +1,4 @@
-import { bridgeAddressMaps, emitterOn, messageIdTopic, parseBridgeEvent } from "../adapters/event.ts";
+import { amountField, bridgeAddressMaps, emitterOn, messageIdTopic, parseBridgeEvent } from "../adapters/event.ts";
 import { bridgeForMinter, chainByAlias, specChains } from "../chains.ts";
 import { describeError, type CcipBridgeSpec, type ChainRef, type Hex, type TokenSpec } from "../types.ts";
 
@@ -89,12 +89,15 @@ function checkBridges(spec: TokenSpec, errors: string[], warnings: string[]): vo
       }
     }
     if (bridge.kind === "ccip_v2") {
+      if (spec.unit === "shares") errors.push(`bridge ${bridge.id}: CCIP 2.0.0 pool events carry balances, not shares, so unit shares cannot use ccip_v2`);
       checkCcip(spec, bridge, errors, warnings);
       continue;
     }
     try {
       const debit = parseBridgeEvent(bridge.events.debitEvent, bridge.events.debitFields);
       const credit = parseBridgeEvent(bridge.events.creditEvent, bridge.events.creditFields);
+      amountField(spec, bridge.id, "debit", bridge.events.debitFields);
+      amountField(spec, bridge.id, "credit", bridge.events.creditFields);
       if (messageIdTopic(debit) !== messageIdTopic(credit)) {
         errors.push(`bridge ${bridge.id}: debit and credit must carry the message id in the same topic`);
       }

@@ -24,7 +24,8 @@ export function schemaErrors(errors: ErrorObject[] | null | undefined, dataVar =
 }
 
 function toFields(raw: RawFieldMap): EventFieldMap {
-  return { messageId: raw.message_id, amount: raw.amount, recipient: raw.recipient, remoteChain: raw.remote_chain };
+  const fields: EventFieldMap = { messageId: raw.message_id, amount: raw.amount, recipient: raw.recipient, remoteChain: raw.remote_chain };
+  return raw.shares === undefined ? fields : { ...fields, shares: raw.shares };
 }
 
 function customEvents(raw: RawCustomBridge): BridgeEvents {

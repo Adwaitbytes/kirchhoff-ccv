@@ -13,6 +13,7 @@ export type RawFieldMap = {
   amount: string;
   recipient: string | null;
   remote_chain: string;
+  shares?: string;
 };
 
 type RawBridgeCommon = {
@@ -87,6 +88,7 @@ const fieldMap = {
     amount: paramName,
     recipient: { anyOf: [paramName, { type: "null" }] },
     remote_chain: paramName,
+    shares: paramName,
   },
 } as const;
 
