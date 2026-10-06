@@ -1,0 +1,71 @@
+{
+  "workflow": "w3-responder",
+  "token": "kETH",
+  "tokenId": "0xe7cbc0ff4035309f71987d099a88ed33ef6bfd1a7d6c1050befb12561b95eb9c",
+  "specHash": "0x22c75309594e0a07596c003695911bb61b1618c9519c1e6d32175ab719915dfe",
+  "home": "ethereum-testnet-sepolia",
+  "breachTrigger": {
+    "chain": "ethereum-testnet-sepolia",
+    "address": "0x05fE18C1cb1FF308aF668a7abaAf6Ac3f623B5D3",
+    "topic0": "0x7d924209a67df2e73df033cb2f896fbc46a792b738e8b743720bfc4d643a010d",
+    "confidence": "FINALIZED"
+  },
+  "chains": [
+    {
+      "name": "ethereum-testnet-sepolia",
+      "selector": "16015286601757825753",
+      "chainId": 11155111,
+      "alias": "home",
+      "isHome": true,
+      "confidence": "finalized",
+      "triggerConfidence": "FINALIZED",
+      "readConfidence": "finalized",
+      "decimals": 18,
+      "token": "0xb270dcD4f512709DFAedBAab736888699BDa0273",
+      "ledger": "0x05fE18C1cb1FF308aF668a7abaAf6Ac3f623B5D3",
+      "quarantine": "0xA3c539ccE9b4E6caCe97E8f4FD1346e1D885aC4a",
+      "feed": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d"
+    },
+    {
+      "name": "ethereum-testnet-sepolia-arbitrum-1",
+      "selector": "3478487238524512106",
+      "chainId": 421614,
+      "alias": "arb",
+      "isHome": false,
+      "confidence": "finalized",
+      "triggerConfidence": "FINALIZED",
+      "readConfidence": "finalized",
+      "decimals": 18,
+      "token": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d",
+      "ledger": "0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0",
+      "quarantine": "0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f",
+      "feed": "0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96"
+    },
+    {
+      "name": "ethereum-testnet-sepolia-base-1",
+      "selector": "10344971235874465080",
+      "chainId": 84532,
+      "alias": "base",
+      "isHome": false,
+      "confidence": "safe",
+      "triggerConfidence": "SAFE",
+      "readConfidence": "finalized",
+      "decimals": 18,
+      "token": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d",
+      "ledger": "0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0",
+      "quarantine": "0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f",
+      "feed": "0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96"
+    }
+  ],
+  "onBroken": [
+    "freeze_ccip_lanes",
+    "taint_recipient",
+    "flip_feed",
+    "page_issuer"
+  ],
+  "notifySecrets": [
+    "NOTIFY_TELEGRAM_BOT_TOKEN",
+    "NOTIFY_TELEGRAM_CHAT_ID",
+    "NOTIFY_SLACK_WEBHOOK_URL"
+  ]
+}
