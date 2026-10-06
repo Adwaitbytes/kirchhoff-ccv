@@ -65,6 +65,8 @@ const report = (i: number): VerdictReport => ({
   receiver: `0x${"22".repeat(20)}`,
   token: "kETH",
   sourceTxHash: SOURCE_TX,
+  sourceBlock: 1,
+  finality: { mode: "finalized", blockDepth: 0, safe: false },
 });
 
 let api: FakeApi | undefined;
@@ -84,6 +86,27 @@ describe("toReport", () => {
     const r = toReport({ ...base, request: kethRequest(h.token), decision: "FAIL", reasonString: "TOKEN_BROKEN kETH DEBIT_NOT_FOUND incident=0x9f3c...", symbol: "kETH" }, SELECTORS);
     expect(r).toMatchObject({ decision: "FAIL", reason: "TOKEN_BROKEN", note: "DEBIT_NOT_FOUND incident=0x9f3c...", token: "kETH", sourceTxHash: SOURCE_TX, latencyMs: 3 });
     expect(parseVerdictReport(r)).toMatchObject({ srcChain: "ethereum-testnet-sepolia-arbitrum-1", dstChain: "ethereum-testnet-sepolia", sourceTxHash: SOURCE_TX });
+  });
+
+  it("carries the fee token, fee amount, source block timestamp and finality (9.H5)", async () => {
+    h = await startHarness();
+    const r = toReport({ ...base, request: kethRequest(h.token), decision: "PASS", reasonString: "OK kETH CONSERVED delta=0 epoch=1", symbol: "kETH" }, SELECTORS);
+    expect(r).toMatchObject({
+      sourceBlock: 1837421,
+      sourceBlockTimestamp: "2026-10-04T12:34:56Z",
+      feeToken: `0x${"0".repeat(64)}`,
+      feeTokenAmount: "1000000000000000",
+      finality: { mode: "finalized", blockDepth: 0, safe: false },
+    });
+    expect(() => parseVerdictReport(r)).not.toThrow();
+  });
+
+  it("omits the optional hook fields the verifier did not send", async () => {
+    h = await startHarness();
+    const { fee_token: _f, fee_token_amount: _a, source_block_timestamp: _t, ...bare } = kethRequest(h.token);
+    const r = toReport({ ...base, request: bare, decision: "PASS", reasonString: "OK kETH CONSERVED", symbol: "kETH" }, SELECTORS);
+    expect(r).not.toBeNull();
+    expect(r !== null && ["feeToken", "feeTokenAmount", "sourceBlockTimestamp"].filter((k) => k in r)).toEqual([]);
   });
 
   it("skips what the read model cannot hold", async () => {

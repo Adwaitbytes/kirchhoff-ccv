@@ -6,7 +6,7 @@
  */
 import { readFileSync } from "node:fs";
 import Ajv from "ajv";
-import { specChains, type Hex, type OnStale, type SpecCacheEntry, type TokenSpec } from "@kirchhoff/engine";
+import { confidenceOn, specChains, type Confidence, type Hex, type OnStale, type SpecCacheEntry, type TokenSpec } from "@kirchhoff/engine";
 import { resolveSpec, type Deployments } from "@kirchhoff/engine";
 import { DEPLOYMENTS_SCHEMA, parseSpec, specHash } from "@kirchhoff/engine/spec";
 import { REGISTRY_ABI } from "./abi.ts";
@@ -23,6 +23,8 @@ export type ChainContracts = {
   pool: Hex | null;
   /** CCIP 2.0.0 OnRamp on this chain, from the resolved spec. */
   onRamp: Hex | null;
+  /** The spec's required confidence for a debit on this chain (PRD section 9 step 8). */
+  confidence: Confidence;
 };
 
 export type ProtectedToken = {
@@ -69,6 +71,7 @@ export function buildToken(spec: TokenSpec, deployments: Deployments): Protected
       token,
       pool: pool === undefined ? null : lower(pool),
       onRamp: onRamp === undefined ? null : lower(onRamp),
+      confidence: confidenceOn(resolved, chain.selector),
     });
   }
   const registry = deployments.chains[resolved.home.chain.name]?.registry;

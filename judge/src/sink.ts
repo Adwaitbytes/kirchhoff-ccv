@@ -22,6 +22,12 @@ export type VerdictReport = {
   receiver: string;
   token?: string;
   sourceTxHash: string;
+  /** Hook provenance (9.H5); the optional ones are omitted when the verifier omitted them. */
+  sourceBlock: number;
+  finality: { mode: "blockDepth" | "finalized"; blockDepth: number; safe: boolean };
+  sourceBlockTimestamp?: string;
+  feeToken?: string;
+  feeTokenAmount?: string;
 };
 
 export type SinkMetrics = {
@@ -147,6 +153,8 @@ export class VerdictSink {
 const BYTES32 = /^0x[0-9a-fA-F]{64}$/;
 const EVM_PADDED = /^0x(?:0{24})?[0-9a-fA-F]{40}$/;
 const CELL_ID = /^[A-Za-z0-9._-]{1,64}$/;
+const HEX_ADDRESS = /^0x[0-9a-fA-F]{0,128}$/;
+const UINT = /^[0-9]{1,78}$/;
 
 export type SinkInput = {
   cellId: string;
@@ -154,7 +162,18 @@ export type SinkInput = {
     message_id: string;
     source_tx_hash: string;
     verifier_id: string;
-    message: { source_chain_selector: string; dest_chain_selector: string; sender: string; receiver: string; token_transfer?: { amount: string } };
+    source_block_number: number;
+    source_block_timestamp?: string;
+    fee_token?: string;
+    fee_token_amount?: string;
+    message: {
+      source_chain_selector: string;
+      dest_chain_selector: string;
+      sender: string;
+      receiver: string;
+      finality: { mode: "blockDepth" | "finalized"; block_depth: number; safe: boolean };
+      token_transfer?: { amount: string };
+    };
   };
   decision: "PASS" | "FAIL" | "PENDING";
   reasonString: string;
@@ -192,5 +211,10 @@ export function toReport(input: SinkInput, specSelectors: ReadonlySet<string>): 
     receiver: m.receiver.toLowerCase(),
     ...(input.symbol === null ? {} : { token: input.symbol }),
     sourceTxHash: r.source_tx_hash.toLowerCase(),
+    sourceBlock: r.source_block_number,
+    finality: { mode: m.finality.mode, blockDepth: m.finality.block_depth, safe: m.finality.safe },
+    ...(r.source_block_timestamp === undefined ? {} : { sourceBlockTimestamp: r.source_block_timestamp }),
+    ...(r.fee_token === undefined || !HEX_ADDRESS.test(r.fee_token) ? {} : { feeToken: r.fee_token.toLowerCase() }),
+    ...(r.fee_token_amount === undefined || !UINT.test(r.fee_token_amount) ? {} : { feeTokenAmount: r.fee_token_amount }),
   };
 }

@@ -4,6 +4,7 @@ import { compileValidators } from "../src/schema.ts";
 import {
   AMOUNT,
   ARB,
+  SOURCE_BLOCK,
   HOME,
   MESSAGE_ID,
   contractsOn,
@@ -184,6 +185,81 @@ describe("FAIL paths (definitive verdicts, HTTP 200)", () => {
     setLedger(HOME, { status: 3 });
     h.stubs.get(ARB)?.[1].state.quarantines.get(contractsOn(h.token, ARB).quarantine)?.tainted.add(SENDER.toLowerCase());
     expect((await verdict()).body).toMatchObject({ decision: "FAIL", reason: "TOKEN_BROKEN kETH OK" });
+  });
+});
+
+describe("hook provenance in the evidence log (9.H5)", () => {
+  it("logs the fee token, fee amount, source block timestamp and finality with every FAIL", async () => {
+    h.both(ARB, (s) => s.state.quarantines.get(contractsOn(h.token, ARB).quarantine)?.tainted.add(SENDER.toLowerCase()));
+    expect((await verdict()).body.decision).toBe("FAIL");
+    expect(failLog().evidence).toMatchObject({
+      feeToken: `0x${"0".repeat(40)}`,
+      feeAmount: "1000000000000000",
+      sourceBlockTimestamp: "1791117296",
+      sourceBlock: "1837421",
+      finalizedBlock: "1837436",
+      finality: { mode: "finalized", blockDepth: 0, safe: false },
+      sourceFinality: "proven by request",
+    });
+  });
+
+  it("logs nulls for the optional fields the verifier omitted, including on a registry FAIL", async () => {
+    h.both(HOME, (s) => s.state.registries.set(h.token.registry.address, `0x${"77".repeat(32)}`));
+    await h.cache.syncOnce();
+    const { fee_token: _f, fee_token_amount: _a, source_block_timestamp: _t, ...bare } = kethRequest(h.token);
+    expect((await verdict(bare)).body.reason).toMatch(/^SPEC_MISMATCH/);
+    expect(failLog().evidence).toMatchObject({ feeToken: null, feeAmount: null, sourceBlockTimestamp: null, sourceBlock: "1837421" });
+  });
+
+  it("rejects a malformed source block timestamp the schema let through", async () => {
+    const res = await post(h.url, { ...kethRequest(h.token), source_block_timestamp: "2026-02-30T00:00:00Z" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/source_block_timestamp/);
+  });
+});
+
+describe("step 8 finality gate (message.finality against the spec's confidence)", () => {
+  /** A faster-than-finality request: N confirmations, emitted past the finalized head it reports. */
+  const fastRequest = () => {
+    const req = kethRequest(h.token);
+    return {
+      ...req,
+      finalized_block_number: Number(SOURCE_BLOCK) - 3,
+      block_depth: 0,
+      message: { ...req.message, finality: { mode: "blockDepth" as const, block_depth: 5, safe: false } },
+    };
+  };
+  const setHead = (tag: string, block: bigint): void => {
+    h.both(ARB, (s) => s.state.heads.set(tag, block));
+  };
+
+  it("answers 503 while the source block is past the finalized head, without looking up the debit", async () => {
+    setHead("finalized", SOURCE_BLOCK - 1n);
+    expectPending(await verdict(fastRequest()), new RegExp(`source block ${SOURCE_BLOCK.toString()} not yet finalized \\(head ${(SOURCE_BLOCK - 1n).toString()}\\)`));
+    const logs = h.logs.map((l) => JSON.parse(l) as Record<string, unknown>).find((l) => l.msg === "verdict pending, verifier will retry");
+    expect(logs?.evidence).toMatchObject({ debit: null, sourceFinality: { confidence: "finalized" } });
+    for (const stub of h.stubs.get(ARB) ?? []) {
+      expect(stub.methods).toContain("eth_getBlockByNumber");
+      expect(stub.methods).not.toContain("eth_getLogs");
+    }
+  });
+
+  it("passes once the current finalized head covers the block, although the request's head is frozen", async () => {
+    setHead("finalized", SOURCE_BLOCK);
+    expect((await verdict(fastRequest())).body.decision).toBe("PASS");
+  });
+
+  it("answers 503 when the providers disagree on the head or have none", async () => {
+    h.stubs.get(ARB)?.[0].state.heads.set("finalized", SOURCE_BLOCK + 9n);
+    h.stubs.get(ARB)?.[1].state.heads.set("finalized", SOURCE_BLOCK + 8n);
+    expectPending(await verdict(fastRequest()), /providers disagree on finalized source head/);
+    h.both(ARB, (s) => { s.state.heads.clear(); });
+    expectPending(await verdict(fastRequest()), /providers disagree on finalized source head/);
+  });
+
+  it("trusts a finalized-mode request whose reported head covers the block, with no head read", async () => {
+    expect((await verdict()).body.decision).toBe("PASS");
+    for (const stub of h.stubs.get(ARB) ?? []) expect(stub.methods).not.toContain("eth_getBlockByNumber");
   });
 });
 

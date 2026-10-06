@@ -10,6 +10,7 @@ import {
   parseHookRequest,
   protectedTransfer,
   reasonName,
+  requestMeetsConfidence,
   toReason,
   type Hex,
   type JudgeDecision,
@@ -17,7 +18,9 @@ import {
   type ProviderPair,
   type Read,
   type ReadPair,
+  type Confidence,
   type SourceDebitLookup,
+  type SourceFinality,
   type StatusRead,
   type TokenEvaluation,
 } from "@kirchhoff/engine";
@@ -73,7 +76,9 @@ type TokenReads = {
   senderTainted: ReadPair<boolean>;
   incident: ReadPair<Hex>;
   breachReason: ReadPair<number> | null;
-  debit: ReadPair<DebitView>;
+  finality: SourceFinality;
+  /** Null when the source block has not reached the spec's confidence: the debit is not looked up. */
+  debit: ReadPair<DebitView> | null;
 };
 
 function toStatus(value: number): Status {
@@ -201,6 +206,34 @@ export async function lookupDebit(
   return { kind: "found", amount: decoded.args.amount, token, logIndex: Number(burn.logIndex) };
 }
 
+type RpcBlockHeader = { number: Hex | null } | null;
+
+/** The source chain's head block at the spec's confidence (a block tag: latest, safe or finalized). */
+export async function sourceHead(client: PublicClient, confidence: Confidence): Promise<bigint> {
+  const block: RpcBlockHeader = await client.request({ method: "eth_getBlockByNumber", params: [confidence, false] });
+  if (block?.number == null) throw new Error(`no ${confidence} block`);
+  return BigInt(block.number);
+}
+
+/**
+ * Step 8 gate, then the debit. When the request does not prove the source block meets the spec's
+ * confidence, the head is read first and the debit is only looked up once both providers agree it
+ * covers the block; the engine answers PENDING otherwise.
+ */
+async function finalityThenDebit(
+  src: ChainContracts,
+  srcRpc: ChainProviders,
+  message: ParsedMessage,
+  lookup: () => Promise<ReadPair<DebitView>>,
+): Promise<{ finality: SourceFinality; debit: ReadPair<DebitView> | null }> {
+  if (requestMeetsConfidence(message, src.confidence)) return { finality: { proven: true }, debit: await lookup() };
+  const head = await readBoth(srcRpc, (c) => sourceHead(c, src.confidence));
+  const finality: SourceFinality = { proven: false, confidence: src.confidence, block: message.sourceBlock, head };
+  const [a, b] = head;
+  const reached = a.ok && b.ok && a.value === b.value && a.value >= message.sourceBlock;
+  return { finality, debit: reached ? await lookup() : null };
+}
+
 async function readToken(
   token: ProtectedToken,
   amount: bigint,
@@ -217,10 +250,12 @@ async function readToken(
     throw new Error("chain resolution must precede reads");
   }
   const { tokenId } = token;
-  const [srcViews, dstViews, debit] = await Promise.all([
+  const lookup = (): Promise<ReadPair<DebitView>> =>
+    readBoth(srcRpc, (c) => lookupDebit(c, src, message.dstChain, message.messageId, message.sourceTxHash, req.source_block_number));
+  const [srcViews, dstViews, { finality, debit }] = await Promise.all([
     readBoth(srcRpc, (c) => sourceView(c, src, tokenId, message.sender)),
     readBoth(dstRpc, (c) => destinationView(c, dst, tokenId)),
-    readBoth(srcRpc, (c) => lookupDebit(c, src, message.dstChain, message.messageId, message.sourceTxHash, req.source_block_number)),
+    finalityThenDebit(src, srcRpc, message, lookup),
   ]);
   const source = field(srcViews, (v) => v.ledger);
   const destination = field(dstViews, (v) => v.ledger);
@@ -241,7 +276,7 @@ async function readToken(
       return breach.reason;
     });
   }
-  return { token, amount, source, destination, sourceFrozen, destinationFrozen, senderTainted, incident, breachReason, debit };
+  return { token, amount, source, destination, sourceFrozen, destinationFrozen, senderTainted, incident, breachReason, finality, debit };
 }
 
 function agreedBreachReason(pair: ReadPair<number> | null): Reason | null {
@@ -276,8 +311,9 @@ function frozenEither(source: ReadPair<boolean>, destination: ReadPair<boolean>)
   return [one(source[0], destination[0]), one(source[1], destination[1])];
 }
 
-function toLookup(d: DebitView): SourceDebitLookup {
-  return d.kind === "found" ? { kind: "found", amount: d.amount } : { kind: "missing" };
+function toLookupRead(r: Read<DebitView>): Read<SourceDebitLookup> {
+  if (!r.ok) return r;
+  return { ok: true, value: r.value.kind === "found" ? { kind: "found", amount: r.value.amount } : { kind: "missing" } };
 }
 
 function pendingDecision(symbol: string | null, note: string): JudgeDecision {
@@ -289,8 +325,25 @@ function readJson<T>(r: Read<T>): unknown {
   return r.ok ? r.value : { error: r.error };
 }
 
+/** The hook's provenance fields (9.H5), carried into every evidence record for the message. */
+function hookEvidence(m: ParsedMessage): Evidence {
+  return {
+    sourceBlock: m.sourceBlock,
+    finalizedBlock: m.finalizedBlock,
+    finality: m.finality,
+    sourceBlockTimestamp: m.sourceBlockTimestamp,
+    feeToken: m.feeToken,
+    feeAmount: m.feeAmount,
+  };
+}
+
+function finalityEvidence(f: SourceFinality): unknown {
+  return f.proven ? "proven by request" : { confidence: f.confidence, head: f.head.map(readJson) };
+}
+
 function evidenceOf(reads: TokenReads, message: ParsedMessage, req: EvaluateRequest): Evidence {
   return {
+    ...hookEvidence(message),
     token: reads.token.symbol,
     tokenId: reads.token.tokenId,
     amount: reads.amount,
@@ -298,7 +351,6 @@ function evidenceOf(reads: TokenReads, message: ParsedMessage, req: EvaluateRequ
     destinationChain: message.dstChain,
     sender: message.sender,
     sourceTx: message.sourceTxHash,
-    sourceBlock: req.source_block_number,
     verifierId: req.verifier_id,
     source: reads.source.map(readJson),
     destination: reads.destination.map(readJson),
@@ -307,7 +359,8 @@ function evidenceOf(reads: TokenReads, message: ParsedMessage, req: EvaluateRequ
     senderTainted: reads.senderTainted.map(readJson),
     incident: reads.incident.map(readJson),
     breachReason: reads.breachReason?.map(readJson) ?? null,
-    debit: reads.debit.map(readJson),
+    sourceFinality: finalityEvidence(reads.finality),
+    debit: reads.debit?.map(readJson) ?? null,
   };
 }
 
@@ -362,7 +415,7 @@ export async function evaluate(
   const token = deps.cache.byTokenId(pt.entry.tokenId);
   if (token === undefined) throw new Error(`spec cache entry ${pt.entry.tokenId} has no token`);
   const active = deps.cache.active(token.tokenId);
-  const evidenceBase = { messageId: message.messageId, token: token.symbol };
+  const evidenceBase = { messageId: message.messageId, token: token.symbol, ...hookEvidence(message) };
   if (active.state === "unsynced") return toOutcome(pendingDecision(token.symbol, `${active.note}, retry`), evidenceBase);
 
   const base: TokenEvaluation = {
@@ -378,6 +431,7 @@ export async function evaluate(
     frozen: [NOT_READ, NOT_READ],
     senderTainted: [NOT_READ, NOT_READ],
     sourceDebit: [NOT_READ, NOT_READ],
+    sourceFinality: { proven: true },
     incidentId: null,
   };
   // Step 3 needs no RPC: the engine answers registry disagreement and undeclared lanes before any read.
@@ -401,10 +455,8 @@ export async function evaluate(
     destination: toProviderPair(reads.destination, breachReason),
     frozen: frozenEither(reads.sourceFrozen, reads.destinationFrozen),
     senderTainted: reads.senderTainted,
-    sourceDebit: [
-      reads.debit[0].ok ? { ok: true, value: toLookup(reads.debit[0].value) } : reads.debit[0],
-      reads.debit[1].ok ? { ok: true, value: toLookup(reads.debit[1].value) } : reads.debit[1],
-    ],
+    sourceFinality: reads.finality,
+    sourceDebit: reads.debit === null ? [NOT_READ, NOT_READ] : [toLookupRead(reads.debit[0]), toLookupRead(reads.debit[1])],
     incidentId,
   };
   const decision = judge({ messageId: message.messageId, token: evaluation, budgetExceeded: false });

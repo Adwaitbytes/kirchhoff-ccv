@@ -41,6 +41,8 @@ export type StubState = {
   quarantines: Map<string, { frozen: boolean; tainted: Set<string> }>;
   registries: Map<string, Hex>;
   logs: StubLog[];
+  /** Head block per tag ("safe", "finalized") for eth_getBlockByNumber; a missing tag answers null. */
+  heads: Map<string, bigint>;
 };
 
 export type FailureMode = "none" | "rpc-error" | "http-500" | "hang";
@@ -64,10 +66,12 @@ export function conservedLedger(overrides: Partial<LedgerState> = {}): LedgerSta
 type RpcRequest = { jsonrpc: "2.0"; id: number | string | null; method: string; params?: unknown[] };
 
 export class RpcStub {
-  state: StubState = { ledgers: new Map(), quarantines: new Map(), registries: new Map(), logs: [] };
+  state: StubState = { ledgers: new Map(), quarantines: new Map(), registries: new Map(), logs: [], heads: new Map() };
   failure: FailureMode = "none";
   delayMs = 0;
   calls = 0;
+  /** Every JSON-RPC method answered, in order. */
+  methods: string[] = [];
   private server: Server | undefined;
   private port = 0;
 
@@ -121,6 +125,7 @@ export class RpcStub {
 
   private dispatch(req: RpcRequest): unknown {
     const params = req.params ?? [];
+    this.methods.push(req.method);
     switch (req.method) {
       case "eth_chainId":
         return "0x7a69";
@@ -129,6 +134,10 @@ export class RpcStub {
       case "eth_call": {
         const call = params[0] as { to: Hex; data: Hex };
         return this.call(call.to.toLowerCase(), call.data);
+      }
+      case "eth_getBlockByNumber": {
+        const head = this.state.heads.get(String(params[0]));
+        return head === undefined ? null : { number: `0x${head.toString(16)}` };
       }
       case "eth_getLogs":
         return this.getLogs(params[0] as { fromBlock: Hex; toBlock: Hex; address: Hex[]; topics: (Hex[] | Hex | null)[] });

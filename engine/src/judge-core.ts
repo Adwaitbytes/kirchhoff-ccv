@@ -5,6 +5,7 @@ import {
   reasonName,
   statusName,
   type ChainSel,
+  type Confidence,
   type Decision,
   type Hex,
   type OnStale,
@@ -20,6 +21,14 @@ export type HookTokenTransfer = {
   receiver: Hex;
 };
 
+/**
+ * `message.finality`: the finality requirement the verifier applied before calling the hook (the
+ * requested one, not the observed depth). `blockDepth` is zero in `finalized` mode.
+ */
+export type HookFinality =
+  | { mode: "finalized"; blockDepth: 0; safe: boolean }
+  | { mode: "blockDepth"; blockDepth: number; safe: false };
+
 /** The parts of a policy hook v1 request the Judge uses, normalized. */
 export type ParsedMessage = {
   messageId: Hex;
@@ -30,6 +39,17 @@ export type ParsedMessage = {
   receiver: Hex;
   /** Null for a data-only message. */
   transfer: HookTokenTransfer | null;
+  /** Block the message was emitted in on the source chain. */
+  sourceBlock: bigint;
+  /** Source finalized head when the message met its finality requirement (fixed across retries). */
+  finalizedBlock: bigint;
+  finality: HookFinality;
+  /** Source block time in unix seconds; null when the verifier did not supply it. */
+  sourceBlockTimestamp: bigint | null;
+  /** Fee asset on the source chain; null when omitted or sent as the empty address "0x". */
+  feeToken: Hex | null;
+  /** Total fee in the fee asset's smallest unit; null when omitted. */
+  feeAmount: bigint | null;
 };
 
 export type HookParseResult = { ok: true; message: ParsedMessage } | { ok: false; error: string };
@@ -75,6 +95,108 @@ function address(obj: Json, key: string): Hex {
   return parsed;
 }
 
+function blockNumber(obj: Json, key: string): bigint {
+  const value = obj[key];
+  // Block numbers are JSON numbers (int64 bounded by a real chain): exact only as safe integers.
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${key} must be a non-negative safe integer`);
+  }
+  return BigInt(value);
+}
+
+const MAX_FINALITY_DEPTH = 65535;
+
+function finality(message: Json): HookFinality {
+  const f = message.finality;
+  if (!isObject(f)) throw new Error("finality must be an object");
+  const depth = f.block_depth;
+  if (typeof depth !== "number" || !Number.isInteger(depth) || depth < 0 || depth > MAX_FINALITY_DEPTH) {
+    throw new Error("finality.block_depth must be an integer 0..65535");
+  }
+  if (typeof f.safe !== "boolean") throw new Error("finality.safe must be a boolean");
+  if (f.mode === "finalized") {
+    if (depth !== 0) throw new Error("finality.block_depth must be 0 in finalized mode");
+    return { mode: "finalized", blockDepth: 0, safe: f.safe };
+  }
+  if (f.mode === "blockDepth") {
+    if (f.safe) throw new Error("finality.safe is only valid in finalized mode");
+    return { mode: "blockDepth", blockDepth: depth, safe: false };
+  }
+  throw new Error("finality.mode must be blockDepth or finalized");
+}
+
+function optionalString(obj: Json, key: string): string | null {
+  const value = obj[key];
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") throw new Error(`${key} must be a string`);
+  return value;
+}
+
+function feeToken(body: Json): Hex | null {
+  const text = optionalString(body, "fee_token");
+  if (text === null || text === "0x") return null;
+  const parsed = evmAddress(text);
+  if (parsed === null) throw new Error("fee_token is not an EVM address");
+  return parsed;
+}
+
+function feeAmount(body: Json): bigint | null {
+  const text = optionalString(body, "fee_token_amount");
+  if (text === null) return null;
+  if (!DECIMAL.test(text)) throw new Error("fee_token_amount must be a decimal string");
+  return BigInt(text);
+}
+
+const RFC3339 = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:([Zz])|([+-])(\d{2}):(\d{2}))$/;
+
+const isLeap = (y: bigint): boolean => (y % 4n === 0n && y % 100n !== 0n) || y % 400n === 0n;
+
+function daysInMonth(y: bigint, m: bigint): bigint {
+  if (m === 2n) return isLeap(y) ? 29n : 28n;
+  return m === 4n || m === 6n || m === 9n || m === 11n ? 30n : 31n;
+}
+
+/** Days since 1970-01-01 for a proleptic Gregorian date (Hinnant's days_from_civil, integer only). */
+function daysFromCivil(year: bigint, month: bigint, day: bigint): bigint {
+  const y = month <= 2n ? year - 1n : year;
+  const era = y / 400n;
+  const yoe = y - era * 400n;
+  const mp = (month + 9n) % 12n;
+  const doy = (153n * mp + 2n) / 5n + day - 1n;
+  const doe = yoe * 365n + yoe / 4n - yoe / 100n + doy;
+  return era * 146097n + doe - 719468n;
+}
+
+/**
+ * RFC 3339 date-time to unix seconds without a clock or Date (the engine never reads one).
+ * Fractional seconds are truncated; a leap second (:60) counts as the next second.
+ */
+export function rfc3339Seconds(text: string): bigint | null {
+  const m = RFC3339.exec(text);
+  if (m === null) return null;
+  // Every group read here took part in the match, so String() never sees undefined.
+  const n = (i: number): bigint => BigInt(String(m[i]));
+  const [year, month, day, hour, minute, second] = [n(1), n(2), n(3), n(4), n(5), n(6)];
+  if (month < 1n || month > 12n || day < 1n || day > daysInMonth(year, month)) return null;
+  if (hour > 23n || minute > 59n || second > 60n) return null;
+  let offset = 0n;
+  if (m[7] === undefined) {
+    const oh = n(9);
+    const om = n(10);
+    if (oh > 23n || om > 59n) return null;
+    offset = (m[8] === "-" ? -1n : 1n) * (oh * 3600n + om * 60n);
+  }
+  return daysFromCivil(year, month, day) * 86400n + hour * 3600n + minute * 60n + second - offset;
+}
+
+function sourceBlockTimestamp(body: Json): bigint | null {
+  const text = optionalString(body, "source_block_timestamp");
+  if (text === null) return null;
+  const seconds = rfc3339Seconds(text);
+  if (seconds === null) throw new Error("source_block_timestamp must be an RFC 3339 date-time");
+  return seconds;
+}
+
 function hex32(obj: Json, key: string): Hex {
   const text = field(obj, key).toLowerCase();
   if (!HEX32.test(text)) throw new Error(`${key} must be 32-byte hex`);
@@ -112,6 +234,12 @@ export function parseHookRequest(body: unknown): HookParseResult {
         sender: address(message, "sender"),
         receiver: address(message, "receiver"),
         transfer,
+        sourceBlock: blockNumber(body, "source_block_number"),
+        finalizedBlock: blockNumber(body, "finalized_block_number"),
+        finality: finality(message),
+        sourceBlockTimestamp: sourceBlockTimestamp(body),
+        feeToken: feeToken(body),
+        feeAmount: feeAmount(body),
       },
     };
   } catch (e) {
@@ -167,6 +295,26 @@ function agreeOn<T>(pair: ReadPair<T>, same: (a: T, b: T) => boolean): Agreed<T>
 const sameDebit = (a: SourceDebitLookup, b: SourceDebitLookup): boolean =>
   a.kind === "missing" ? b.kind === "missing" : b.kind === "found" && a.amount === b.amount;
 
+/**
+ * PRD section 9 step 8 with Junction Rule 4: the source debit counts only once its block is at or
+ * below the spec's confidence for the source chain. `proven` when the request's own finality
+ * fields show it; otherwise the Judge read the source head at that confidence through both
+ * providers, because the request's finalized_block_number is frozen across retries.
+ */
+export type SourceFinality =
+  | { proven: true }
+  | { proven: false; confidence: Confidence; block: bigint; head: ReadPair<bigint> };
+
+/**
+ * Whether the request alone proves the source block meets `required`: the finalized head it
+ * reports covers the block, or the verifier waited for at least the safe head (finalized mode)
+ * and the spec asks for no more than safe. A blockDepth requirement proves nothing on its own.
+ */
+export function requestMeetsConfidence(m: ParsedMessage, required: Confidence): boolean {
+  if (required === "latest" || m.sourceBlock <= m.finalizedBlock) return true;
+  return required === "safe" && m.finality.mode === "finalized";
+}
+
 /** Everything the Judge service read for the protected token in the message. */
 export type TokenEvaluation = {
   symbol: string;
@@ -195,6 +343,7 @@ export type TokenEvaluation = {
    * LockedOrBurned paired with CCIPMessageSent in source_tx_hash.
    */
   sourceDebit: ReadPair<SourceDebitLookup>;
+  sourceFinality: SourceFinality;
   /** Latest incident for the token, quoted in FAIL notes when the token is contained. */
   incidentId: Hex | null;
 };
@@ -282,7 +431,24 @@ export function judge(input: JudgeInput): JudgeDecision {
   if (!frozen.ok) return decide("PENDING", Reason.PENDING_ATTESTATION, t.symbol, "providers disagree on frozen, retry");
   if (!tainted.ok) return decide("PENDING", Reason.PENDING_ATTESTATION, t.symbol, "providers disagree on senderTainted, retry");
 
-  // Step 8: the source pool debit for this message id must exist with the same amount.
+  // Step 8: the source block must meet the spec's confidence before its debit can count; a block
+  // that is not final yet may still be reorged away, so the answer is a retry.
+  const finality = t.sourceFinality;
+  if (!finality.proven) {
+    const head = agreeOn(finality.head, (a, b) => a === b);
+    if (!head.ok) {
+      return decide("PENDING", Reason.PENDING_ATTESTATION, t.symbol, `providers disagree on ${finality.confidence} source head, retry`);
+    }
+    if (head.value < finality.block) {
+      return decide(
+        "PENDING",
+        Reason.PENDING_ATTESTATION,
+        t.symbol,
+        `source block ${finality.block.toString()} not yet ${finality.confidence} (head ${head.value.toString()}), retry`,
+      );
+    }
+  }
+  // The source pool debit for this message id must exist with the same amount.
   const debit = agreeOn(t.sourceDebit, sameDebit);
   if (!debit.ok) return decide("PENDING", Reason.PENDING_ATTESTATION, t.symbol, "providers disagree on sourceDebit, retry");
   if (debit.value.kind === "missing") {

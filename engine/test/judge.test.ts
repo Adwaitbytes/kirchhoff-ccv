@@ -5,6 +5,8 @@ import {
   judge,
   parseHookRequest,
   protectedTransfer,
+  requestMeetsConfidence,
+  rfc3339Seconds,
   type ParsedMessage,
   type Read,
   type ReadPair,
@@ -39,6 +41,7 @@ function token(over: Partial<TokenEvaluation> = {}): TokenEvaluation {
     frozen: both(false),
     senderTainted: both(false),
     sourceDebit: both<SourceDebitLookup>({ kind: "found", amount: units(10n) }),
+    sourceFinality: { proven: true },
     incidentId: null,
     ...over,
   };
@@ -61,6 +64,7 @@ function request(over: Record<string, unknown> = {}, message: Record<string, unk
       dest_chain_selector: HOME.toString(),
       sender: padded(ALICE),
       receiver: padded(ALICE),
+      finality: { mode: "finalized", block_depth: 0, safe: false },
       token_transfer: {
         version: 1,
         amount: units(10n).toString(),
@@ -99,8 +103,39 @@ describe("parseHookRequest (policy hook v1)", () => {
         sender: ALICE,
         receiver: ALICE,
         transfer: { amount: units(10n), sourceToken: REMOTE_ARB, sourcePool: POOL_ARB, destToken: CANONICAL, receiver: ALICE },
+        sourceBlock: 10n,
+        finalizedBlock: 12n,
+        finality: { mode: "finalized", blockDepth: 0, safe: false },
+        sourceBlockTimestamp: null,
+        feeToken: null,
+        feeAmount: null,
       },
     });
+  });
+  it("parses the fee token, fee amount and source block timestamp (9.H5)", () => {
+    const r = parseHookRequest(
+      request({
+        fee_token: padded(POOL_ARB.toUpperCase().replace("0X", "0x") as Hex),
+        fee_token_amount: "340282366920938463463374607431768211457",
+        source_block_timestamp: "2026-10-04T12:34:56Z",
+      }),
+    );
+    expect(r).toMatchObject({
+      ok: true,
+      message: { feeToken: POOL_ARB, feeAmount: 340282366920938463463374607431768211457n, sourceBlockTimestamp: 1791117296n },
+    });
+  });
+  it("keeps a known zero fee and reads the empty fee address as absent", () => {
+    const r = parseHookRequest(request({ fee_token: "0x", fee_token_amount: "0" }));
+    expect(r).toMatchObject({ ok: true, message: { feeToken: null, feeAmount: 0n } });
+    const zero = parseHookRequest(request({ fee_token: `0x${"0".repeat(64)}`, fee_token_amount: null }));
+    expect(zero).toMatchObject({ ok: true, message: { feeToken: `0x${"0".repeat(40)}`, feeAmount: null } });
+  });
+  it.each([
+    [{ mode: "blockDepth", block_depth: 12, safe: false }, { mode: "blockDepth", blockDepth: 12, safe: false }],
+    [{ mode: "finalized", block_depth: 0, safe: true }, { mode: "finalized", blockDepth: 0, safe: true }],
+  ])("parses the finality object %j", (finality, parsed) => {
+    expect(parseHookRequest(request({}, { finality }))).toMatchObject({ ok: true, message: { finality: parsed } });
   });
   it("keeps selectors above 2^63 exact", () => {
     const r = parseHookRequest(request({}, { source_chain_selector: "16015286601757825753" }));
@@ -123,10 +158,82 @@ describe("parseHookRequest (policy hook v1)", () => {
     ["a bad message id", request({ message_id: "0x12" }), /message_id/],
     ["a malformed token_transfer", request({}, { token_transfer: [] }), /token_transfer/],
     ["a non-decimal amount", request({}, { token_transfer: { amount: "1e18" } }), /amount must be a decimal/],
+    ["a fractional source block", request({ source_block_number: 1.5 }), /source_block_number must be a non-negative safe integer/],
+    ["a string finalized block", request({ finalized_block_number: "12" }), /finalized_block_number/],
+    ["a negative finalized block", request({ finalized_block_number: -1 }), /finalized_block_number/],
+    ["a missing finality", request({}, { finality: undefined }), /finality must be an object/],
+    ["an unknown finality mode", request({}, { finality: { mode: "safe", block_depth: 0, safe: true } }), /finality.mode/],
+    ["a finality depth above uint16", request({}, { finality: { mode: "blockDepth", block_depth: 65536, safe: false } }), /block_depth/],
+    ["a fractional finality depth", request({}, { finality: { mode: "blockDepth", block_depth: 1.5, safe: false } }), /block_depth/],
+    ["a non-boolean safe flag", request({}, { finality: { mode: "finalized", block_depth: 0, safe: "no" } }), /finality.safe must/],
+    ["a depth in finalized mode", request({}, { finality: { mode: "finalized", block_depth: 3, safe: false } }), /0 in finalized mode/],
+    ["safe with blockDepth", request({}, { finality: { mode: "blockDepth", block_depth: 3, safe: true } }), /only valid in finalized/],
+    ["a numeric fee token", request({ fee_token: 7 }), /fee_token must be a string/],
+    ["a non-EVM fee token", request({ fee_token: `0x${"1".repeat(64)}` }), /fee_token is not an EVM address/],
+    ["a non-decimal fee", request({ fee_token_amount: "0x10" }), /fee_token_amount must be a decimal/],
+    ["a timestamp without a zone", request({ source_block_timestamp: "2026-10-04T12:34:56" }), /RFC 3339/],
+    ["a timestamp on February 30", request({ source_block_timestamp: "2026-02-30T00:00:00Z" }), /RFC 3339/],
   ])("rejects %s", (_label, body, pattern) => {
     const r = parseHookRequest(body);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(pattern);
+  });
+});
+
+describe("rfc3339Seconds", () => {
+  it.each([
+    ["1970-01-01T00:00:00Z", 0n],
+    ["2026-10-04T12:34:56Z", 1791117296n],
+    ["2026-10-04t12:34:56.999z", 1791117296n],
+    ["2026-10-04T20:34:56+08:00", 1791117296n],
+    ["2026-10-04T07:04:56-05:30", 1791117296n],
+    ["2024-02-29T00:00:00Z", 1709164800n],
+    ["2000-03-01T00:00:00Z", 951868800n],
+    ["1969-12-31T23:59:59Z", -1n],
+    ["2016-12-31T23:59:60Z", 1483228800n],
+  ])("%s is %i", (text, seconds) => {
+    expect(rfc3339Seconds(text)).toBe(seconds);
+  });
+  it.each([
+    "2026-10-04",
+    "2026-13-01T00:00:00Z",
+    "2026-00-01T00:00:00Z",
+    "2026-04-31T00:00:00Z",
+    "2026-04-00T00:00:00Z",
+    "2023-02-29T00:00:00Z",
+    "1900-02-29T00:00:00Z",
+    "2026-06-01T24:00:00Z",
+    "2026-06-01T23:60:00Z",
+    "2026-06-01T23:59:61Z",
+    "2026-06-01T00:00:00+24:00",
+    "2026-06-01T00:00:00+05:60",
+  ])("rejects %s", (text) => {
+    expect(rfc3339Seconds(text)).toBeNull();
+  });
+});
+
+describe("requestMeetsConfidence (step 8 finality gate)", () => {
+  const parsed = (over: Record<string, unknown>, message: Record<string, unknown> = {}): ParsedMessage => {
+    const r = parseHookRequest(request(over, message));
+    if (!r.ok) throw new Error(r.error);
+    return r.message;
+  };
+  const fast = { finality: { mode: "blockDepth", block_depth: 5, safe: false } };
+  const safeHead = { finality: { mode: "finalized", block_depth: 0, safe: true } };
+  it("is proven when the reported finalized head covers the source block, whatever the mode", () => {
+    expect(requestMeetsConfidence(parsed({}, fast), "finalized")).toBe(true);
+    expect(requestMeetsConfidence(parsed({ finalized_block_number: 10 }, fast), "finalized")).toBe(true);
+  });
+  it("a blockDepth requirement past the finalized head proves neither finalized nor safe", () => {
+    const m = parsed({ finalized_block_number: 9, block_depth: 0 }, fast);
+    expect(requestMeetsConfidence(m, "finalized")).toBe(false);
+    expect(requestMeetsConfidence(m, "safe")).toBe(false);
+    expect(requestMeetsConfidence(m, "latest")).toBe(true);
+  });
+  it("a safe-head requirement satisfies a safe spec but not a finalized one", () => {
+    const m = parsed({ finalized_block_number: 9, block_depth: 0 }, safeHead);
+    expect(requestMeetsConfidence(m, "safe")).toBe(true);
+    expect(requestMeetsConfidence(m, "finalized")).toBe(false);
   });
 });
 
@@ -256,6 +363,33 @@ describe("judge: PRD section 9 steps 3 to 9 with INTERFACES.md revision 2", () =
     expect(run(token({ sourceDebit: both<SourceDebitLookup>({ kind: "found", amount: 1n }) }))).toMatchObject({
       decision: "FAIL",
       reason: Reason.AMOUNT_MISMATCH,
+    });
+  });
+
+  describe("step 8: the source block must meet the spec's confidence before the debit counts", () => {
+    const unproven = (head: ReadPair<bigint>): Partial<TokenEvaluation> => ({
+      sourceFinality: { proven: false, confidence: "finalized", block: 100n, head },
+    });
+    it("is PENDING while the source head is below the block, even with a matching debit", () => {
+      expect(run(token(unproven(both(99n))))).toMatchObject({
+        decision: "PENDING",
+        reasonString: "PENDING_ATTESTATION kETH source block 100 not yet finalized (head 99), retry",
+      });
+    });
+    it("is PENDING when the providers disagree on the head", () => {
+      expect(run(token(unproven([ok(100n), ok(101n)])))).toMatchObject({
+        decision: "PENDING",
+        note: "providers disagree on finalized source head, retry",
+      });
+      expect(run(token(unproven([down, ok(101n)]))).decision).toBe("PENDING");
+    });
+    it("goes on to the debit once the head reaches the block", () => {
+      expect(run(token(unproven(both(100n)))).decision).toBe("PASS");
+      const r = run(token({ ...unproven(both(150n)), sourceDebit: both<SourceDebitLookup>({ kind: "found", amount: 1n }) }));
+      expect(r).toMatchObject({ decision: "FAIL", reason: Reason.AMOUNT_MISMATCH });
+    });
+    it("runs after the containment flags, which fail at once", () => {
+      expect(run(token({ ...unproven(both(0n)), frozen: both(true) }))).toMatchObject({ decision: "FAIL", note: "lanes frozen" });
     });
   });
 

@@ -37,7 +37,7 @@ function sourceContracts(req: EvaluateRequest): ChainContracts {
   const token = evmAddress(tt.source_token_address);
   const onRamp = evmAddress(req.message.on_ramp_address);
   if (pool === null || token === null || onRamp === null) throw new Error("non-EVM addresses");
-  return { selector: BigInt(req.message.source_chain_selector), name: "ethereum-testnet-sepolia", ledger: "0x00", quarantine: "0x00", token, pool, onRamp };
+  return { selector: BigInt(req.message.source_chain_selector), name: "ethereum-testnet-sepolia", ledger: "0x00", quarantine: "0x00", token, pool, onRamp, confidence: "finalized" };
 }
 
 function stubLogs(fixture: RealFixture, stub: RpcStub): void {
