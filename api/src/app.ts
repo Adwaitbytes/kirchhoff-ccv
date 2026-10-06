@@ -26,6 +26,7 @@ import {
   type ReplayPlanResponse,
   type Address,
   type ApiKeysResponse,
+  type SubscriptionResponse,
   type TokensResponse,
   type TokenStatusResponse,
   type VerdictsResponse,
@@ -34,6 +35,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { parseSpec } from "@kirchhoff/engine/spec";
 import type { Notifier } from "@kirchhoff/indexer/notifier";
+import { HolderSubscriptions, statusPageUrl } from "@kirchhoff/indexer/subscriptions";
 import { askBackend, type AiServices } from "./ai.ts";
 import { IncidentPager } from "./pager.ts";
 import { replayPlan } from "./replay.ts";
@@ -45,8 +47,9 @@ import type { LabRunner } from "./lab.ts";
 import { inProcessBackend, registerMcp } from "./mcp.ts";
 import { checkTransfer, type ChainClients } from "./onchain.ts";
 import type { Ops } from "./ops.ts";
-import { ReadModel } from "./readmodel.ts";
+import { ReadModel, type TokenRow } from "./readmodel.ts";
 import { Materializer, StreamHub } from "./stream.ts";
+import { StatusFanout, TelegramBot, replyTo, secretMatches, type TelegramConfig } from "./telegram.ts";
 import * as v from "./validate.ts";
 
 export type AppDeps = {
@@ -69,6 +72,8 @@ export type AppDeps = {
   webPublicUrl?: string | null;
   /** CCV aggregator gRPC URL for replay plans (ccip-cli manual-exec --verifiers). */
   aggregatorUrl?: string | null;
+  /** Holder alerts bot. Without a bot token the webhook is 404 and no alert is sent. */
+  telegram?: TelegramConfig;
   /** Fetch used to resolve spec URIs (tests inject one). */
   specFetch?: typeof fetch;
 };
@@ -110,12 +115,15 @@ export async function buildApp(deps: AppDeps): Promise<App> {
   const mat = new Materializer(deps.db, rm, incidents, (id) => deps.lab.get(id));
   const hub = deps.websocket ? new StreamHub(mat) : null;
   const specResolver = new SpecResolver(deps.db, deps.specFetch ? { fetch: deps.specFetch } : {});
+  const subscriptions = new HolderSubscriptions(deps.db);
+  const tg = deps.telegram ?? {};
+  const bot = tg.botToken ? new TelegramBot(tg.botToken, { ...(tg.fetch ? { fetch: tg.fetch } : {}), ...(tg.apiBase ? { apiBase: tg.apiBase } : {}) }) : null;
   app.decorate("kirchhoff", { hub, rm, incidents, auth });
   await auth.seed(deps.issuerKey).catch((e: unknown) => {
     console.error("kirchhoff api: could not seed the issuer key row", e instanceof Error ? e.message : e);
   });
 
-  await app.register(cors, { origin: deps.corsOrigins, methods: ["GET", "POST", "OPTIONS"], allowedHeaders: ["content-type", "authorization", "last-event-id"] });
+  await app.register(cors, { origin: deps.corsOrigins, methods: ["GET", "POST", "DELETE", "OPTIONS"], allowedHeaders: ["content-type", "authorization", "last-event-id"] });
   await app.register(rateLimit, { global: false });
   if (deps.websocket) await app.register(websocket, { options: { maxPayload: 1024 } });
 
@@ -206,6 +214,69 @@ export async function buildApp(deps: AppDeps): Promise<App> {
           return dryRun(body);
         },
       );
+
+      const subscriptionBody = async (body: unknown): Promise<{ token: TokenRow; chatId: string }> => {
+        const b = v.object(body);
+        const symbol = v.tokenSymbol(b.token);
+        const chatId = v.telegramChatId(b.telegramChatId);
+        return { token: await rm.tokenRow(symbol), chatId };
+      };
+      const subscriptionResponse = async (
+        token: TokenRow,
+        chatId: string,
+        row: { active: boolean; createdAt: Date } | null,
+      ): Promise<SubscriptionResponse> => ({
+        ...(await rm.meta(token)),
+        token: token.symbol,
+        channel: "telegram",
+        telegramChatId: chatId,
+        active: row?.active ?? false,
+        createdAt: row?.createdAt.toISOString() ?? null,
+        delivery: bot ? "enabled" : "disabled",
+        statusPageUrl: statusPageUrl(deps.webPublicUrl ?? null, token.symbol),
+      });
+      const subscriptionLimit = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
+
+      r.post<{ Body: unknown }>("/subscriptions", subscriptionLimit, async (req, reply) => {
+        const { token, chatId } = await subscriptionBody(req.body);
+        const row = await subscriptions.subscribe(token.symbol, "telegram", chatId);
+        return reply.status(201).send(await subscriptionResponse(token, chatId, row));
+      });
+
+      r.delete<{ Body: unknown }>("/subscriptions", subscriptionLimit, async (req): Promise<SubscriptionResponse> => {
+        const { token, chatId } = await subscriptionBody(req.body);
+        const row = await subscriptions.unsubscribe(token.symbol, "telegram", chatId);
+        return subscriptionResponse(token, chatId, row);
+      });
+
+      // Telegram retries non-2xx deliveries, so every authenticated update is acknowledged with 200.
+      const webhook = async (req: FastifyRequest<{ Body: unknown; Params: { secret?: string } }>, reply: FastifyReply): Promise<FastifyReply> => {
+        if (!bot || !tg.webhookSecret) throw notFound("telegram webhook");
+        const header = req.headers["x-telegram-bot-api-secret-token"];
+        const given = typeof header === "string" ? header : req.params.secret;
+        if (!secretMatches(given, tg.webhookSecret)) throw new ApiFailure(401, "UNAUTHORIZED", "invalid webhook secret");
+        const answer = await replyTo(req.body, {
+          subscriptions,
+          webPublicUrl: deps.webPublicUrl ?? null,
+          knownTokens: async () => (await rm.tokenRows()).map((t) => t.symbol),
+          token: async (symbol) => {
+            const t = await rm.tokenRow(symbol).catch((e: unknown) => {
+              if (e instanceof ApiFailure && e.code === "NOT_FOUND") return null;
+              throw e;
+            });
+            return t ? { symbol: t.symbol, status: t.status, reason: t.reason, delta: t.delta, decimals: t.decimals, epochId: t.epoch_id, stale: t.stale, simulation: t.simulation } : null;
+          },
+        });
+        if (answer) {
+          await bot.sendMessage(answer.chatId, answer.text, AbortSignal.timeout(5_000)).catch((e: unknown) => {
+            console.error("kirchhoff telegram: reply failed", e instanceof Error ? e.message : "unknown error");
+          });
+        }
+        return reply.status(200).send({ ok: true });
+      };
+      const webhookLimit = { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } };
+      r.post<{ Body: unknown; Params: { secret?: string } }>("/telegram/webhook", webhookLimit, webhook);
+      r.post<{ Body: unknown; Params: { secret?: string } }>("/telegram/webhook/:secret", webhookLimit, webhook);
 
       r.post<{ Body: unknown }>("/specs/draft", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (req, reply) => {
         await auth.require(req.headers.authorization, "specs:draft");
@@ -508,8 +579,11 @@ export async function buildApp(deps: AppDeps): Promise<App> {
 
   const pager = deps.notifier && deps.websocket ? new IncidentPager(deps.db, incidents, deps.ai, deps.notifier, { linkBase: deps.webPublicUrl ?? null }) : null;
   pager?.start();
+  const fanout = bot && deps.websocket ? new StatusFanout(subscriptions, bot, { linkBase: deps.webPublicUrl ?? null }) : null;
+  fanout?.start();
   app.addHook("onClose", () => {
     pager?.stop();
+    fanout?.stop();
     hub?.stop();
     deps.lab.stop();
   });

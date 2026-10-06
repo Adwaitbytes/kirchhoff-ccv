@@ -74,3 +74,10 @@ export function decodeCursor(v: unknown, arity: number): (string | number)[] | n
   }
   throw badRequest("cursor is invalid");
 }
+
+/** Numeric Telegram chat id (groups and channels are negative) or a public @channel handle. */
+export const TELEGRAM_CHAT_ID = /^(-?[1-9]\d{0,19}|@[A-Za-z][A-Za-z0-9_]{4,31})$/;
+
+export function telegramChatId(v: unknown, field = "telegramChatId"): string {
+  return str(v, field, { max: 33, pattern: TELEGRAM_CHAT_ID });
+}

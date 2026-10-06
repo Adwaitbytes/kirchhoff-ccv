@@ -8,6 +8,8 @@ import { ScriptedProvider } from "@kirchhoff/ai";
 import { parseSpec, specHash } from "@kirchhoff/engine/spec";
 import { Notifier, type IncidentNotice } from "@kirchhoff/indexer/notifier";
 import { IncidentPager } from "../src/pager.ts";
+import { HolderSubscriptions } from "@kirchhoff/indexer/subscriptions";
+import { StatusFanout, TelegramBot } from "../src/telegram.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -24,6 +26,7 @@ import type {
   LabStatusResponse,
   OpsResponse,
   StreamMessage,
+  SubscriptionResponse,
   TokensResponse,
   TokenStatusResponse,
   VerdictsResponse,
@@ -534,5 +537,164 @@ describe("incident pager", () => {
     const loop = seen.find((x) => x.incidentId === loopIncidentId);
     expect(loop?.offendingLabel).toMatch(/^Loop Rule BREACH report/);
     expect(await pager.tick()).toEqual([]);
+  });
+});
+
+describe("holder Telegram subscriptions (PRD 3 nice-to-have 2)", () => {
+  const BOT_TOKEN = "777:test-bot-token";
+  const SECRET = "test-webhook-secret-0123456789";
+  type Sent = { url: string; chatId: string; text: string };
+  const sent: Sent[] = [];
+  const mockTelegram = ((url: string | URL, init?: RequestInit) => {
+    const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { chat_id: string; text: string };
+    sent.push({ url: String(url), chatId: body.chat_id, text: body.text });
+    // A chat that blocked the bot.
+    return Promise.resolve(new Response(JSON.stringify({ ok: body.chat_id !== "-1009" }), { status: body.chat_id === "-1009" ? 403 : 200 }));
+  }) as typeof fetch;
+  let tgApp: App;
+
+  beforeAll(async () => {
+    tgApp = await buildApp({
+      db,
+      ai: new AiServices({ db, ai: { provider: null, model: "none", fastModel: "none" }, mode: "local", rpc: world.rpc, etherscanKey: undefined, narratorWaitMs: 50 }),
+      lab: new LabRunner({ enabled: false, disabledReason: "off", command: "true", args: [], cwd: ".", timeoutMs: 1000, token: "kETH", attacker: ACCOUNTS.attacker.address }, db),
+      ops: new Ops(db, { rpc: world.rpc, chains: [HOME, ARB, BASE], cells: [], enforcement: "token_pool_fallback" }),
+      clients: chainClients(world.rpc, "local"),
+      issuerKey: ISSUER_KEY,
+      internalKey: INTERNAL_KEY,
+      defaultToken: "kETH",
+      websocket: false,
+      sseMaxMs: 1_000,
+      corsOrigins: true,
+      webPublicUrl: "https://kirchhoff.test",
+      telegram: { botToken: BOT_TOKEN, webhookSecret: SECRET, fetch: mockTelegram },
+    });
+  });
+  afterAll(async () => {
+    await tgApp.close();
+  });
+
+  const call = async (a: App, method: "POST" | "DELETE", payload: unknown): Promise<{ status: number; body: SubscriptionResponse & ApiErrorBody }> => {
+    const res = await a.inject({ method, url: "/v1/subscriptions", payload: payload as Record<string, unknown> });
+    return { status: res.statusCode, body: res.json() };
+  };
+  const update = (text: string, chatId = 5551234): Record<string, unknown> => ({ update_id: 1, message: { message_id: 1, chat: { id: chatId, type: "private" }, text } });
+  const hook = (payload: unknown, headers: Record<string, string> = {}, url = "/v1/telegram/webhook") => tgApp.inject({ method: "POST", url, headers, payload: payload as Record<string, unknown> });
+
+  it("POST validates the body and refuses unknown tokens", async () => {
+    expect((await call(tgApp, "POST", { token: "kETH", telegramChatId: "not-a-chat" })).status).toBe(400);
+    expect((await call(tgApp, "POST", { token: "kETH" })).status).toBe(400);
+    expect((await call(tgApp, "POST", { token: "kETH; drop", telegramChatId: "42" })).status).toBe(400);
+    expect((await call(tgApp, "POST", [])).status).toBe(400);
+    const unknown = await call(tgApp, "POST", { token: "NOPE", telegramChatId: "42" });
+    expect(unknown.status).toBe(404);
+    expect(unknown.body.error.code).toBe("NOT_FOUND");
+  });
+
+  it("subscribes idempotently and unsubscribes, with MirrorMeta on every response", async () => {
+    const a = await call(tgApp, "POST", { token: "keth", telegramChatId: "@kirchhoff_alerts" });
+    expect(a.status).toBe(201);
+    expectMeta(a.body);
+    expect(a.body).toMatchObject({ token: "kETH", channel: "telegram", telegramChatId: "@kirchhoff_alerts", active: true, delivery: "enabled", statusPageUrl: "https://kirchhoff.test/t/kETH" });
+    const again = await call(tgApp, "POST", { token: "kETH", telegramChatId: "@kirchhoff_alerts" });
+    expect(again.body.createdAt).toBe(a.body.createdAt);
+    const del = await call(tgApp, "DELETE", { token: "kETH", telegramChatId: "@kirchhoff_alerts" });
+    expect(del.status).toBe(200);
+    expectMeta(del.body);
+    expect(del.body).toMatchObject({ active: false, createdAt: a.body.createdAt });
+    const gone = await call(tgApp, "DELETE", { token: "kETH", telegramChatId: "@kirchhoff_alerts" });
+    expect(gone.body).toMatchObject({ active: false, createdAt: null });
+  });
+
+  it("disabled mode: without a bot token subscriptions report delivery disabled and the webhook is 404", async () => {
+    const before = sent.length;
+    const r = await call(app, "POST", { token: "kETH", telegramChatId: "99" });
+    expect(r.status).toBe(201);
+    expect(r.body.delivery).toBe("disabled");
+    const res = await app.inject({ method: "POST", url: "/v1/telegram/webhook", headers: { "x-telegram-bot-api-secret-token": SECRET }, payload: update("/status kETH") });
+    expect(res.statusCode).toBe(404);
+    await call(app, "DELETE", { token: "kETH", telegramChatId: "99" });
+    expect(sent.length).toBe(before);
+  });
+
+  it("webhook rejects a missing or wrong secret and accepts the header or the path segment", async () => {
+    expect((await hook(update("/status kETH"))).statusCode).toBe(401);
+    expect((await hook(update("/status kETH"), { "x-telegram-bot-api-secret-token": "wrong" })).statusCode).toBe(401);
+    expect((await hook(update("/status kETH"), {}, "/v1/telegram/webhook/wrong")).statusCode).toBe(401);
+    expect(sent).toHaveLength(0);
+    expect((await hook(update("/status kETH"), { "x-telegram-bot-api-secret-token": SECRET })).statusCode).toBe(200);
+    expect((await hook(update("/status kETH"), {}, `/v1/telegram/webhook/${SECRET}`)).statusCode).toBe(200);
+    expect(sent).toHaveLength(2);
+    expect(sent[0]?.url).toBe(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`);
+    expect(sent[0]?.chatId).toBe("5551234");
+    expect(sent[0]?.text).toMatch(/^kETH is QUARANTINED|^kETH is BROKEN/);
+    expect(sent[0]?.text).toContain("Status page: https://kirchhoff.test/t/kETH");
+  });
+
+  it("webhook commands subscribe, unsubscribe and explain themselves", async () => {
+    sent.length = 0;
+    const h = { "x-telegram-bot-api-secret-token": SECRET };
+    await hook(update("/subscribe@KirchhoffBot kETH", 777001), h);
+    expect(sent.at(-1)?.text).toMatch(/^Subscribed to kETH\./);
+    const rows = await db.query<{ active: boolean }>("select active from token_subscriptions where chat_id = '777001'");
+    expect(rows.rows).toEqual([{ active: true }]);
+    await hook(update("/unsubscribe kETH", 777001), h);
+    expect(sent.at(-1)?.text).toBe("Unsubscribed from kETH.");
+    await hook(update("/unsubscribe kETH", 777001), h);
+    expect(sent.at(-1)?.text).toBe("This chat was not subscribed to kETH.");
+    await hook(update("/subscribe NOPE", 777001), h);
+    expect(sent.at(-1)?.text).toBe("Unknown token. Protected tokens: kETH.");
+    await hook(update("/start", 777001), h);
+    expect(sent.at(-1)?.text).toMatch(/^KIRCHHOFF holder alerts/);
+    const n = sent.length;
+    expect((await hook(update("just chatting", 777001), h)).statusCode).toBe(200);
+    expect((await hook({ update_id: 2, edited_message: {} }, h)).statusCode).toBe(200);
+    expect(sent.length).toBe(n);
+    for (const m of sent) expect(m.text).not.toMatch(/\u2014|\u2013/);
+  });
+
+  it("fans out each home-ledger status transition once per active subscriber, and drops blocked chats", async () => {
+    sent.length = 0;
+    const subs = new HolderSubscriptions(db);
+    await subs.subscribe("kETH", "telegram", "424242");
+    await subs.subscribe("kETH", "telegram", "-1009");
+    await subs.subscribe("kETH", "telegram", "515151");
+    await subs.unsubscribe("kETH", "telegram", "515151");
+    const tx = (n: number): string => `0x${n.toString(16).padStart(64, "f")}`;
+    const insert = (n: number, chain: string, at: string, to: string): Promise<unknown> =>
+      db.query(
+        `insert into status_changes (chain, tx_hash, log_index, block, block_time, token_symbol, from_status, to_status, reason)
+         values ($1, $2, 0, 99999990 + $3::int, ${at}, 'kETH', 'QUARANTINED', $4, 'OK')`,
+        [chain, tx(n), n, to],
+      );
+    // Before the subscription, on a non-home chain, then the real transition on the home ledger.
+    await insert(1, HOME, "now() - interval '1 hour'", "RECOVERING");
+    await insert(2, ARB, "now() + interval '1 second'", "RECOVERING");
+    await insert(3, HOME, "now() + interval '1 second'", "RECOVERING");
+    try {
+      const fanout = new StatusFanout(subs, new TelegramBot(BOT_TOKEN, { fetch: mockTelegram }), { linkBase: "https://kirchhoff.test" });
+      expect(await fanout.tick()).toBe(1);
+      const delivered = sent.filter((m) => m.chatId === "424242");
+      expect(delivered).toHaveLength(1);
+      expect(delivered[0]?.text).toContain("kETH is now RECOVERING (was QUARANTINED)");
+      expect(delivered[0]?.text).toMatch(/Delta: -?[\d,.]+ kETH\./);
+      expect(delivered[0]?.text).toContain("Status page: https://kirchhoff.test/t/kETH");
+      expect(sent.some((m) => m.chatId === "515151")).toBe(false);
+      // The blocked chat was tried once and deactivated; nothing is sent twice.
+      expect(sent.filter((m) => m.chatId === "-1009")).toHaveLength(1);
+      expect(await fanout.tick()).toBe(0);
+      expect(sent.filter((m) => m.chatId === "424242")).toHaveLength(1);
+      expect(sent.filter((m) => m.chatId === "-1009")).toHaveLength(1);
+      const rows = await db.query<{ chat_id: string; active: boolean; last_notified_status: string | null }>(
+        "select chat_id, active, last_notified_status from token_subscriptions where chat_id in ('424242', '-1009') order by chat_id",
+      );
+      expect(rows.rows).toEqual([
+        { chat_id: "-1009", active: false, last_notified_status: null },
+        { chat_id: "424242", active: true, last_notified_status: "RECOVERING" },
+      ]);
+    } finally {
+      await db.query("delete from status_changes where block > 99999990");
+      await db.query("delete from token_subscriptions");
+    }
   });
 });

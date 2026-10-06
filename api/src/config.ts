@@ -87,6 +87,7 @@ export function depsFromEnv(env: NodeJS.ProcessEnv, runtime: Runtime, db?: Db): 
     corsOrigins: env.CORS_ORIGINS ? env.CORS_ORIGINS.split(",").map((s) => s.trim()) : true,
     notifier: new Notifier(database, channelsFromEnv(env)),
     webPublicUrl: env.WEB_PUBLIC_URL ?? null,
+    telegram: { botToken: env.TELEGRAM_BOT_TOKEN, webhookSecret: env.TELEGRAM_WEBHOOK_SECRET },
     aggregatorUrl: env.CCV_AGGREGATOR_URL ?? null,
   };
 }
