@@ -2,11 +2,11 @@
   "workflow": "w4-topology",
   "token": "kETH",
   "tokenId": "0xe7cbc0ff4035309f71987d099a88ed33ef6bfd1a7d6c1050befb12561b95eb9c",
-  "specHash": "0x22c75309594e0a07596c003695911bb61b1618c9519c1e6d32175ab719915dfe",
+  "specHash": "0xb6c418e6c183d55144d68f278527e8a069ca3f78e11e1b267bdddca541eddcad",
   "schedule": "0 */10 * * * *",
   "registry": {
     "chain": "ethereum-testnet-sepolia",
-    "address": "0x98Ec613f16CF077De8b34a7C32f4b767cc90840e",
+    "address": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
     "specActivatedTopic0": "0xf913cd77a23bc3e2b165b27586cbd5e5b8592ed1e8b38acc254c923e9a4424bc"
   },
   "roleGrantedTopic0": "0x2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d",
@@ -23,8 +23,8 @@
         "selector": "16015286601757825753",
         "alias": "home"
       },
-      "canonical": "0xb270dcD4f512709DFAedBAab736888699BDa0273",
-      "escrow": "0xdE9A6413AC2C29Cd6621f93FCD872eBB46b6a3D7",
+      "canonical": "0x89767Dab88D356DED2f5e5D153644E08505981c8",
+      "escrow": "0x528Df7b17dc1702772cBc6a2ABD8eBA4E4260191",
       "decimals": 18
     },
     "remotes": [
@@ -34,7 +34,7 @@
           "selector": "3478487238524512106",
           "alias": "arb"
         },
-        "token": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d",
+        "token": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
         "minters": [
           "ccip_pool_arb",
           "weakbridge_arb"
@@ -47,7 +47,7 @@
           "selector": "10344971235874465080",
           "alias": "base"
         },
-        "token": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d",
+        "token": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
         "minters": [
           "ccip_pool_base",
           "weakbridge_base"
@@ -62,9 +62,9 @@
         "maxDeliverySeconds": 1200,
         "kind": "ccip_v2",
         "pools": {
-          "home": "0x1c60f8B189E6Ea5F04C9510fAef5021605a22BDe",
-          "arb": "0x98Ec613f16CF077De8b34a7C32f4b767cc90840e",
-          "base": "0x98Ec613f16CF077De8b34a7C32f4b767cc90840e"
+          "home": "0xbD6164B658CfE68AD28ffc8053962940d87f20aB",
+          "arb": "0x89767Dab88D356DED2f5e5D153644E08505981c8",
+          "base": "0x89767Dab88D356DED2f5e5D153644E08505981c8"
         },
         "onramps": {
           "home": "0x8dcf17f298c881A547D91ca4aA3C2AD7568C6777",
@@ -76,7 +76,7 @@
           "arb": "0xC93218EB7B778bC0c13E5296140C8E4Fa1C440DA",
           "base": "0xa137536A3BFd81aD6f090981268b8C2818451d41"
         },
-        "lockbox": "0x8fa18a722eED4ef8C40C2552b92Db07ccdD6f899"
+        "lockbox": "0x12BdA4cA9F7C9Ae72B0F7Dae6B85e1a7973D1c08"
       },
       {
         "id": "weakbridge",
@@ -84,9 +84,9 @@
         "maxDeliverySeconds": 1200,
         "kind": "custom",
         "contracts": {
-          "home": "0xdE9A6413AC2C29Cd6621f93FCD872eBB46b6a3D7",
-          "arb": "0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78",
-          "base": "0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78"
+          "home": "0x528Df7b17dc1702772cBc6a2ABD8eBA4E4260191",
+          "arb": "0x50db1f9fDc7c015A46d12E090C2C46B4C842D779",
+          "base": "0x50db1f9fDc7c015A46d12E090C2C46B4C842D779"
         },
         "events": {
           "debitEvent": "Burned(bytes32 indexed id, address indexed from, address to, uint256 amount, uint64 dstChain)",
@@ -152,13 +152,13 @@
       "triggerConfidence": "FINALIZED",
       "readConfidence": "finalized",
       "decimals": 18,
-      "token": "0xb270dcD4f512709DFAedBAab736888699BDa0273",
-      "ledger": "0x05fE18C1cb1FF308aF668a7abaAf6Ac3f623B5D3",
-      "quarantine": "0xA3c539ccE9b4E6caCe97E8f4FD1346e1D885aC4a",
-      "feed": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d",
+      "token": "0x89767Dab88D356DED2f5e5D153644E08505981c8",
+      "ledger": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
+      "quarantine": "0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9",
+      "feed": "0x937C381243CA23664bd858fc342fEa7801De5E8e",
       "expectedMinters": [],
       "ccipPools": [
-        "0x1c60f8B189E6Ea5F04C9510fAef5021605a22BDe"
+        "0xbD6164B658CfE68AD28ffc8053962940d87f20aB"
       ],
       "tokenAdminRegistry": "0x95F29FEE11c5C55d26cCcf1DB6772DE953B37B82"
     },
@@ -172,16 +172,16 @@
       "triggerConfidence": "FINALIZED",
       "readConfidence": "finalized",
       "decimals": 18,
-      "token": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d",
-      "ledger": "0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0",
-      "quarantine": "0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f",
-      "feed": "0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96",
+      "token": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
+      "ledger": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
+      "quarantine": "0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9",
+      "feed": "0x937C381243CA23664bd858fc342fEa7801De5E8e",
       "expectedMinters": [
-        "0x98Ec613f16CF077De8b34a7C32f4b767cc90840e",
-        "0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78"
+        "0x89767Dab88D356DED2f5e5D153644E08505981c8",
+        "0x50db1f9fDc7c015A46d12E090C2C46B4C842D779"
       ],
       "ccipPools": [
-        "0x98Ec613f16CF077De8b34a7C32f4b767cc90840e"
+        "0x89767Dab88D356DED2f5e5D153644E08505981c8"
       ],
       "tokenAdminRegistry": "0x8126bE56454B628a88C17849B9ED99dd5a11Bd2f"
     },
@@ -195,16 +195,16 @@
       "triggerConfidence": "SAFE",
       "readConfidence": "finalized",
       "decimals": 18,
-      "token": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d",
-      "ledger": "0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0",
-      "quarantine": "0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f",
-      "feed": "0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96",
+      "token": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
+      "ledger": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
+      "quarantine": "0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9",
+      "feed": "0x937C381243CA23664bd858fc342fEa7801De5E8e",
       "expectedMinters": [
-        "0x98Ec613f16CF077De8b34a7C32f4b767cc90840e",
-        "0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78"
+        "0x89767Dab88D356DED2f5e5D153644E08505981c8",
+        "0x50db1f9fDc7c015A46d12E090C2C46B4C842D779"
       ],
       "ccipPools": [
-        "0x98Ec613f16CF077De8b34a7C32f4b767cc90840e"
+        "0x89767Dab88D356DED2f5e5D153644E08505981c8"
       ],
       "tokenAdminRegistry": "0x736D0bBb318c1B27Ff686cd19804094E66250e17"
     }

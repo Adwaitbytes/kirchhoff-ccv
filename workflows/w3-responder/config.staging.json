@@ -2,11 +2,11 @@
   "workflow": "w3-responder",
   "token": "kETH",
   "tokenId": "0xe7cbc0ff4035309f71987d099a88ed33ef6bfd1a7d6c1050befb12561b95eb9c",
-  "specHash": "0x22c75309594e0a07596c003695911bb61b1618c9519c1e6d32175ab719915dfe",
+  "specHash": "0xb6c418e6c183d55144d68f278527e8a069ca3f78e11e1b267bdddca541eddcad",
   "home": "ethereum-testnet-sepolia",
   "breachTrigger": {
     "chain": "ethereum-testnet-sepolia",
-    "address": "0x05fE18C1cb1FF308aF668a7abaAf6Ac3f623B5D3",
+    "address": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
     "topic0": "0x7d924209a67df2e73df033cb2f896fbc46a792b738e8b743720bfc4d643a010d",
     "confidence": "FINALIZED"
   },
@@ -21,10 +21,10 @@
       "triggerConfidence": "FINALIZED",
       "readConfidence": "finalized",
       "decimals": 18,
-      "token": "0xb270dcD4f512709DFAedBAab736888699BDa0273",
-      "ledger": "0x05fE18C1cb1FF308aF668a7abaAf6Ac3f623B5D3",
-      "quarantine": "0xA3c539ccE9b4E6caCe97E8f4FD1346e1D885aC4a",
-      "feed": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d"
+      "token": "0x89767Dab88D356DED2f5e5D153644E08505981c8",
+      "ledger": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
+      "quarantine": "0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9",
+      "feed": "0x937C381243CA23664bd858fc342fEa7801De5E8e"
     },
     {
       "name": "ethereum-testnet-sepolia-arbitrum-1",
@@ -36,10 +36,10 @@
       "triggerConfidence": "FINALIZED",
       "readConfidence": "finalized",
       "decimals": 18,
-      "token": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d",
-      "ledger": "0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0",
-      "quarantine": "0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f",
-      "feed": "0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96"
+      "token": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
+      "ledger": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
+      "quarantine": "0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9",
+      "feed": "0x937C381243CA23664bd858fc342fEa7801De5E8e"
     },
     {
       "name": "ethereum-testnet-sepolia-base-1",
@@ -51,10 +51,10 @@
       "triggerConfidence": "SAFE",
       "readConfidence": "finalized",
       "decimals": 18,
-      "token": "0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d",
-      "ledger": "0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0",
-      "quarantine": "0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f",
-      "feed": "0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96"
+      "token": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
+      "ledger": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
+      "quarantine": "0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9",
+      "feed": "0x937C381243CA23664bd858fc342fEa7801De5E8e"
     }
   ],
   "onBroken": [
