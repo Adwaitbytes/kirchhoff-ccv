@@ -21,6 +21,8 @@ deployments/local*
 deployments/wfs*
 contracts/broadcast/
 api/.vercel-stage/
-media/video/
+media/video/takes/
+media/video/.stack/
+media/video/kirchhoff-demo.mp4
 workflows/runner.log.jsonl
 *.log.jsonl

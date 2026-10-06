@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>KIRCHHOFF card</title>
+<!--
+  Title and closing cards for the stage recording (PRD section 15). Rendered at 1920x1080 by record.ts and captured
+  frame by frame, so every animation here is CSS on the page timeline.
+    card.html?kind=title&label=Local%20rehearsal&tone=local
+    card.html?kind=closing&label=Testnet%20simulation&tone=testnet&footer=...
+  Headline numbers come from docs/PRD.md section 1 (Crypto Times, Phemex); keep them in sync with media/deck/build.cjs.
+-->
+<style>
+  :root {
+    --bg: #0b0d10;
+    --fg: #e7eaee;
+    --muted: #9aa3af;
+    --subtle: #7d8693;
+    --wire: #2a313b;
+    --teal: #2dd4bf;
+    --red: #f43f5e;
+    --amber: #fbbf24;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; background: #000; overflow: hidden; }
+  body {
+    font-family: "Inter", "Inter Variable", system-ui, sans-serif;
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  /* The stage: black first, then the control-room canvas fades up under the type. */
+  .stage { position: absolute; inset: 0; background: var(--bg); opacity: 0; animation: fade 1.4s var(--ease) forwards; }
+  .stage::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(1200px 600px at 18% 12%, rgb(45 212 191 / 0.07), transparent 60%),
+      radial-gradient(900px 600px at 88% 90%, rgb(244 63 94 / 0.06), transparent 60%);
+  }
+  .stage::after {
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgb(154 163 175 / 0.11) 1px, transparent 1px);
+    background-size: 24px 24px;
+    mask-image: radial-gradient(1100px 700px at 50% 45%, #000 30%, transparent 80%);
+  }
+  .title .stage { animation-delay: 1.1s; }
+  .closing .stage { animation-delay: 0.5s; }
+
+  .content { position: absolute; inset: 0; padding: 120px 160px; display: flex; flex-direction: column; }
+  .in { opacity: 0; transform: translateY(14px); animation: rise 900ms var(--ease) forwards; }
+
+  .chip {
+    position: absolute; top: 56px; left: 160px;
+    display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 14px;
+    border-radius: 8px; font-size: 17px; font-weight: 500; letter-spacing: 0.01em;
+    border: 1px solid rgb(251 191 36 / 0.4); background: rgb(251 191 36 / 0.1); color: var(--amber);
+  }
+  .chip svg { width: 18px; height: 18px; }
+  .chip.local { border-color: rgb(244 63 94 / 0.5); background: rgb(244 63 94 / 0.12); color: #fda4af; }
+  .brand { position: absolute; top: 56px; right: 160px; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 18px; font-weight: 600; letter-spacing: 0.16em; }
+  .brand svg { width: 30px; height: 30px; }
+
+  /* Title */
+  .eyebrow { font-size: 22px; font-weight: 500; color: var(--muted); letter-spacing: 0.02em; margin-top: 150px; }
+  .eyebrow b { color: var(--red); font-weight: 600; }
+  h1 { font-size: 104px; line-height: 1.02; font-weight: 650; letter-spacing: -0.035em; margin-top: 26px; max-width: 1500px; }
+  h1 .soft { color: var(--muted); font-weight: 500; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 96px; border-top: 1px solid var(--wire); }
+  .stat { padding: 34px 40px 0 0; }
+  .stat + .stat { padding-left: 40px; border-left: 1px solid var(--wire); }
+  .stat .n { font-size: 76px; line-height: 1; font-weight: 500; letter-spacing: -0.03em; }
+  .stat .n.red { color: var(--red); }
+  .stat .l { margin-top: 18px; font-size: 24px; line-height: 1.4; color: var(--muted); max-width: 420px; }
+  .sources { position: absolute; left: 160px; bottom: 64px; font-size: 16px; color: var(--subtle); letter-spacing: 0.01em; }
+
+  /* Closing */
+  .closing .content { align-items: center; justify-content: center; text-align: center; padding: 0 160px; }
+  .mark { display: flex; align-items: center; gap: 22px; }
+  .mark svg { width: 76px; height: 76px; }
+  .mark span { font-size: 54px; font-weight: 650; letter-spacing: 0.22em; }
+  .tagline { margin-top: 64px; font-size: 64px; line-height: 1.18; font-weight: 600; letter-spacing: -0.03em; }
+  .tagline .l2 { color: var(--teal); }
+  .foot { position: absolute; bottom: 64px; left: 0; right: 0; text-align: center; font-size: 18px; color: var(--subtle); }
+
+  .fadeout { animation: out 700ms ease-in forwards; }
+
+  @keyframes fade { to { opacity: 1; } }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  @keyframes out { to { opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<template id="logo">
+  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#12151a"/><path d="M16 16 L6.5 8.5 M16 16 L25.5 8.5 M16 16 V26" stroke="#e7eaee" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="16" r="3.4" fill="#2dd4bf"/><circle cx="6.5" cy="8.5" r="1.6" fill="#9aa3af"/><circle cx="25.5" cy="8.5" r="1.6" fill="#9aa3af"/><circle cx="16" cy="26" r="1.6" fill="#9aa3af"/></svg>
+</template>
+<script>
+  const q = new URLSearchParams(location.search);
+  const kind = q.get("kind") === "closing" ? "closing" : "title";
+  const label = q.get("label") || "Testnet simulation";
+  const tone = q.get("tone") === "local" ? "local" : "testnet";
+  const footer = q.get("footer") || "";
+  const logo = document.getElementById("logo").innerHTML;
+  const flask = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></svg>';
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const at = (s) => `style="animation-delay:${s}s"`;
+  document.body.className = kind;
+  const chip = `<div class="chip ${tone} in" ${at(kind === "title" ? 1.6 : 0.9)}>${flask}${esc(label)}</div>`;
+  const brand = `<div class="brand in" ${at(kind === "title" ? 1.6 : 0.9)}>${logo}KIRCHHOFF</div>`;
+  const root = document.getElementById("root");
+  if (kind === "title") {
+    root.innerHTML = `<div class="stage"></div>${chip}${brand}<div class="content">
+      <p class="eyebrow in" ${at(1.9)}><b>April 18, 2026</b> &nbsp;·&nbsp; Kelp DAO rsETH bridge</p>
+      <h1 class="in" ${at(2.5)}>One forged message.<br><span class="soft">Value from nothing.</span></h1>
+      <div class="stats">
+        <div class="stat in" ${at(4.4)}><div class="n red mono">$292M</div><div class="l">of rsETH released by one forged LayerZero message</div></div>
+        <div class="stat in" ${at(5.0)}><div class="n mono">116,500</div><div class="l">rsETH credited with no matching burn</div></div>
+        <div class="stat in" ${at(5.6)}><div class="n mono">20 chains</div><div class="l">where rsETH holders lost value without touching Kelp</div></div>
+      </div>
+      <p class="sources in" ${at(6.4)}>Sources: Crypto Times, May 18 2026 (loss, amount) · Phemex (chains)</p>
+    </div>`;
+  } else {
+    root.innerHTML = `<div class="stage"></div>${chip}<div class="content">
+      <div class="mark in" ${at(0.9)}>${logo}<span>KIRCHHOFF</span></div>
+      <p class="tagline"><span class="in" style="display:block;animation-delay:1.6s">Every bridge checks who signed.</span><span class="l2 in" style="display:block;animation-delay:2.6s">Kirchhoff checks if the money adds up.</span></p>
+    </div>${footer ? `<p class="foot in" ${at(3.4)}>${esc(footer)}</p>` : ""}`;
+  }
+  // record.ts calls window.cardOut() for the last 0.7s of a card.
+  window.cardOut = () => document.body.classList.add("fadeout");
+</script>
+</body>
+</html>

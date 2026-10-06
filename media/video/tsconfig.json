@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "sourceMap": false,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "typeRoots": ["../../web/node_modules/@types"],
+    "paths": { "@playwright/test": ["../../web/node_modules/@playwright/test"] }
+  },
+  "include": ["record.ts", "engine.ts"]
+}

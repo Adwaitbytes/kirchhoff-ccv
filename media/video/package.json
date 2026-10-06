@@ -1,0 +1,11 @@
+{
+  "name": "@kirchhoff/video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Records the 2:30 KIRCHHOFF stage demo (PRD section 15) from real runs",
+  "type": "module",
+  "scripts": {
+    "record": "node record.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}
