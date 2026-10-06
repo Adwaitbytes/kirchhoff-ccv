@@ -3,7 +3,7 @@
 import { ReplayAfterRecovery } from "@/components/incident/replay-plan";
 import { scrubZeros } from "@/components/incident/loop";
 import { ArrowUpRight, Check, CircleDashed, Lock, Sparkles } from "lucide-react";
-import type { EvidenceItem, IncidentResponse, NarrativeSentence } from "@/lib/api/types";
+import type { ChainKey, EvidenceItem, IncidentResponse, NarrativeSentence, TxRef } from "@/lib/api/types";
 import { PLAYBOOK_LABEL } from "@/lib/api/types";
 import { CHAINS } from "@/lib/chains";
 import { ccipMessageUrl, shortHash, txRefUrl } from "@/lib/explorer";
@@ -149,6 +149,10 @@ export function ActionsCard({ r }: { r: IncidentResponse }) {
 
 /* ---------------------------------------------------------------- Blast radius */
 
+function freezeTx(r: IncidentResponse, chain: ChainKey): TxRef | undefined {
+  return r.actions.find((c) => c.kind === "freeze_ccip_lanes")?.txs.find((t) => t.chain === chain);
+}
+
 export function BlastRadiusCard({ r, decimals }: { r: IncidentResponse; decimals: number }) {
   const sym = r.incident.token;
   return (
@@ -167,7 +171,7 @@ export function BlastRadiusCard({ r, decimals }: { r: IncidentResponse; decimals
           return (
             <li key={b.chain} className="bg-panel px-4 py-3">
               <p className="text-xs text-muted">{CHAINS[b.chain].name}</p>
-              <Verifiable href={proof} label={`Exposure on ${CHAINS[b.chain].name}`} className={cn("mt-1 block font-mono text-lg font-medium", exposure > 0n ? "text-broken" : "text-subtle")}>
+              <Verifiable href={proof} label={`Exposure ${formatAmount(exposure, { decimals, maxFraction: 0 })} ${sym} on ${CHAINS[b.chain].name}, ${b.chain === r.incident.offending.chain && exposure > 0n ? "offending transaction" : "evidence transaction"} on the explorer`} className={cn("mt-1 block font-mono text-lg font-medium", exposure > 0n ? "text-broken" : "text-subtle")}>
                 {formatAmount(exposure, { decimals, maxFraction: 0 })}
                 <span className="ml-1 font-sans text-xs font-normal text-muted">{sym}</span>
               </Verifiable>
@@ -175,7 +179,14 @@ export function BlastRadiusCard({ r, decimals }: { r: IncidentResponse; decimals
                 {b.frozenLanes.length > 0 ? (
                   <span className="inline-flex items-center gap-1 text-quarantined">
                     <Lock className="size-3" aria-hidden="true" />
-                    {b.frozenLanes.length} lanes frozen
+                    {freezeTx(r, b.chain) ? (
+                      <Verifiable href={txRefUrl(freezeTx(r, b.chain)!)} label={`${b.frozenLanes.length} lanes frozen on ${CHAINS[b.chain].name}, freeze transaction on the explorer`} className="font-mono">
+                        {b.frozenLanes.length}
+                      </Verifiable>
+                    ) : (
+                      b.frozenLanes.length
+                    )}{" "}
+                    lanes frozen
                   </span>
                 ) : (
                   <span>Lanes open</span>
@@ -223,9 +234,9 @@ export function HeldMessagesCard({ r, decimals }: { r: IncidentResponse; decimal
               <a href={ccipMessageUrl(h.messageId)} target="_blank" rel="noopener noreferrer" className="truncate font-mono text-xs text-fg hover:underline" aria-label={`CCIP message ${h.messageId}`}>
                 {shortHash(h.messageId, 10, 6)}
               </a>
-              <a href={ccipMessageUrl(h.messageId)} target="_blank" rel="noopener noreferrer" className="justify-self-end font-mono text-sm text-fg tnum hover:underline">
+              <Verifiable href={ccipMessageUrl(h.messageId)} label={`${formatAmount(parseWei(h.amount), { decimals, maxFraction: 0 })} ${r.incident.token} held, CCIP message on the CCIP explorer`} className="justify-self-end font-mono text-sm text-fg">
                 {formatAmount(parseWei(h.amount), { decimals, maxFraction: 0 })} <span className="font-sans text-xs text-muted">{r.incident.token}</span>
-              </a>
+              </Verifiable>
               <span className="text-xs text-muted">
                 {CHAINS[h.srcChain].short} to {CHAINS[h.dstChain].short} · <span className="font-mono">{h.reason}</span>
               </span>

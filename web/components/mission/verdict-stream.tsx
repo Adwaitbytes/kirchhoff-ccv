@@ -9,6 +9,8 @@ import { ccipMessageUrl, shortHash, txRefUrl } from "@/lib/explorer";
 import { formatAmount, formatTime, parseWei } from "@/lib/format";
 import { usePrefs } from "@/lib/prefs";
 import { DecisionWord } from "@/components/kh/status";
+import { SourcedFigure, Verifiable, publicUrl } from "@/components/kh/links";
+import { useApi } from "@/lib/api/provider";
 import { EmptyState } from "@/components/kh/panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -27,7 +29,7 @@ function announce(v: Verdict, decimals: number, symbol: string): string {
   return v.decision === "PASS" ? `PASS. ${amount}, ${lane}.` : `FAIL. ${refusedCopy(v)}. ${amount}.`;
 }
 
-function Row({ v, decimals, symbol, fresh }: { v: Verdict; decimals: number; symbol: string; fresh: boolean }) {
+function Row({ v, decimals, symbol, fresh, source }: { v: Verdict; decimals: number; symbol: string; fresh: boolean; source: string | null }) {
   const fail = v.decision === "FAIL";
   const agreeing = v.cells.filter((c) => c.decision === v.decision).length;
   const p50 = v.cells.length ? [...v.cells].sort((a, b) => a.latencyMs - b.latencyMs)[Math.floor(v.cells.length / 2)]?.latencyMs : null;
@@ -58,9 +60,9 @@ function Row({ v, decimals, symbol, fresh }: { v: Verdict; decimals: number; sym
           </p>
         )}
         <p className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-muted">
-          <a href={txRefUrl(v.sourceTx)} target="_blank" rel="noopener noreferrer" className="shrink-0 whitespace-nowrap font-mono text-fg/90 tnum hover:underline" title="Source debit transaction">
+          <Verifiable href={txRefUrl(v.sourceTx)} label={`${formatAmount(parseWei(v.amount), { decimals })} ${symbol}, source debit transaction on ${CHAINS[v.sourceTx.chain].name}`} className="shrink-0 whitespace-nowrap font-mono text-fg/90">
             {formatAmount(parseWei(v.amount), { decimals })} {symbol}
-          </a>
+          </Verifiable>
           <span className="text-subtle">·</span>
           {fail ? (
             <span className="whitespace-nowrap" title={`${CHAINS[v.srcChain].name} to ${CHAINS[v.dstChain].name}, never executed`}>
@@ -73,8 +75,21 @@ function Row({ v, decimals, symbol, fresh }: { v: Verdict; decimals: number; sym
             // Narrow columns drop the detail by priority instead of clipping it mid-word.
             <span className="flex min-w-0 items-center gap-1 whitespace-nowrap" title={`${v.reason} · ${agreeing} of ${v.cells.length} cells${p50 !== null && p50 !== undefined ? ` · ${p50}ms` : ""}`}>
               <span className="font-mono">{v.reason}</span>
-              <span className="hidden @[12.5rem]:inline">· {agreeing} of {v.cells.length} cells</span>
-              {p50 !== null && p50 !== undefined ? <span className="hidden @[15rem]:inline">· {p50}ms</span> : null}
+              <span className="hidden @[12.5rem]:inline">
+                ·{" "}
+                <SourcedFigure href={source} label={`${agreeing} of ${v.cells.length} cells agreed, from the verdict rows`}>
+                  {agreeing} of {v.cells.length}
+                </SourcedFigure>{" "}
+                cells
+              </span>
+              {p50 !== null && p50 !== undefined ? (
+                <span className="hidden @[15rem]:inline">
+                  ·{" "}
+                  <SourcedFigure href={source} label={`Judge latency ${p50}ms, median across cells, from the verdict rows`}>
+                    {p50}ms
+                  </SourcedFigure>
+                </span>
+              ) : null}
             </span>
           )}
         </p>
@@ -102,6 +117,8 @@ export function VerdictStream({ verdicts, decimals, symbol }: { verdicts: Verdic
   const [polite, setPolite] = useState("");
   const [assertive, setAssertive] = useState("");
   const { reducedMotion } = usePrefs();
+  // Cell agreement and latency are computed offchain; their source is the verdict rows themselves.
+  const source = publicUrl(`${useApi().baseUrl}/tokens/${encodeURIComponent(symbol)}/verdicts`);
 
   useEffect(() => {
     if (seen.current === null) {
@@ -138,7 +155,7 @@ export function VerdictStream({ verdicts, decimals, symbol }: { verdicts: Verdic
               if (!v) return null;
               return (
                 <div key={item.key} role="listitem" style={{ position: "absolute", top: 0, left: 0, right: 0, height: item.size, transform: `translateY(${item.start}px)` }}>
-                  <Row v={v} decimals={decimals} symbol={symbol} fresh={fresh.has(v.id)} />
+                  <Row v={v} decimals={decimals} symbol={symbol} fresh={fresh.has(v.id)} source={source} />
                 </div>
               );
             })}

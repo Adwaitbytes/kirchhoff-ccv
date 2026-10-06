@@ -4,9 +4,9 @@ import { isZeroHex, scrubZeros } from "@/components/incident/loop";
 import { Ban, Lock, OctagonX, SearchX, ShieldX, Sigma, Zap, type LucideIcon } from "lucide-react";
 import type { EvidenceItem, EvidenceKind } from "@/lib/api/types";
 import { CHAINS } from "@/lib/chains";
-import { blockUrl, ccipMessageUrl, shortHash } from "@/lib/explorer";
+import { blockUrl, ccipMessageUrl, shortHash, txRefUrl } from "@/lib/explorer";
 import { formatTime } from "@/lib/format";
-import { ExternalLink, TxLink } from "@/components/kh/links";
+import { ExternalLink, TxLink, Verifiable } from "@/components/kh/links";
 import { cn } from "@/lib/utils";
 import { sortedEvidence } from "@/components/incident/postmortem";
 
@@ -63,14 +63,20 @@ export function EvidenceTimeline({ evidence, highlighted }: { evidence: readonly
                 {e.blocks ? (
                   <span className="flex flex-wrap items-center gap-1 text-xs text-muted">
                     Blocks
-                    <ExternalLink href={blockUrl(e.chain, e.blocks.from)} label={`Block ${e.blocks.from} on ${CHAINS[e.chain].name}`} className="font-mono text-fg/90 tnum">
+                    <Verifiable href={blockUrl(e.chain, e.blocks.from)} label={`Block ${e.blocks.from} on ${CHAINS[e.chain].name}, block on the explorer`} className="font-mono text-fg/90">
                       {Number(e.blocks.from).toLocaleString("en-US")}
-                    </ExternalLink>
+                    </Verifiable>
                     to
-                    <ExternalLink href={blockUrl(e.chain, e.blocks.to)} label={`Block ${e.blocks.to} on ${CHAINS[e.chain].name}`} className="font-mono text-fg/90 tnum">
+                    <Verifiable href={blockUrl(e.chain, e.blocks.to)} label={`Block ${e.blocks.to} on ${CHAINS[e.chain].name}, block on the explorer`} className="font-mono text-fg/90">
                       {Number(e.blocks.to).toLocaleString("en-US")}
-                    </ExternalLink>
-                    <span className={cn("ml-1 font-mono", e.blocks.matches === 0 ? "text-broken" : "text-conserved")}>{e.blocks.matches} matches</span>
+                    </Verifiable>
+                    <Verifiable
+                      href={e.tx ? txRefUrl(e.tx) : blockUrl(e.chain, e.blocks.to)}
+                      label={`${e.blocks.matches} matches in blocks ${e.blocks.from} to ${e.blocks.to}, ${e.tx ? "recorded in the evidence transaction" : "searched up to this block on the explorer"}`}
+                      className={cn("ml-1 font-mono", e.blocks.matches === 0 ? "text-broken" : "text-conserved")}
+                    >
+                      {e.blocks.matches} matches
+                    </Verifiable>
                   </span>
                 ) : null}
                 {e.kind === "refused_message" && e.messageId && !isZeroHex(e.messageId) ? (

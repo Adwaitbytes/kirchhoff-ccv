@@ -86,6 +86,7 @@ function StalenessTimer({ status }: { status: TokenStatusResponse }) {
   const limit = status.stalenessSeconds;
   const frac = Math.min(1, age / limit);
   const stale = status.token.stale || age > limit;
+  const epochTx = status.epoch?.reportTxs[0];
   const r = 7;
   const circ = 2 * Math.PI * r;
   return (
@@ -96,7 +97,14 @@ function StalenessTimer({ status }: { status: TokenStatusResponse }) {
           <circle cx="9" cy="9" r={r} fill="none" stroke={stale ? "var(--status-unknown)" : frac > 0.75 ? "var(--status-drift)" : "var(--status-conserved)"} strokeWidth="2" strokeDasharray={circ} strokeDashoffset={circ * (1 - frac)} strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s linear" }} />
         </svg>
         <span className={cn("tnum", stale ? "text-unknown-text" : "text-muted")}>
-          <span className="font-mono text-fg">{formatAge(age)}</span> ago
+          {epochTx ? (
+            <Verifiable href={txRefUrl(epochTx)} label={`Last epoch ${formatAge(age)} ago, epoch ${status.epoch?.epochId} report transaction`} className="font-mono text-fg">
+              {formatAge(age)}
+            </Verifiable>
+          ) : (
+            <span className="font-mono text-fg">{formatAge(age)}</span>
+          )}{" "}
+          ago
         </span>
       </span>
     </Tooltip>
@@ -131,7 +139,7 @@ export function MissionTopBar({ token, status, stream }: { token: string; status
           {epochTx && hasEpoch(status.token) ? (
             <span className="hidden text-sm text-muted sm:inline">
               Epoch{" "}
-              <Verifiable href={txRefUrl(epochTx)} label={`Epoch ${status.epoch?.epochId} report transaction`} className="font-mono text-fg">
+              <Verifiable href={txRefUrl(epochTx)} label={`Epoch ${status.epoch?.epochId}, its report transaction on the explorer`} className="font-mono text-fg">
                 {Number(status.epoch?.epochId).toLocaleString("en-US")}
               </Verifiable>
             </span>

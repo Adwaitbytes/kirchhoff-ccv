@@ -71,7 +71,7 @@ export function DeltaReadout({ delta, decimals, symbol, href, size = "hero" }: {
   );
 }
 
-function Bar({ label, value, scale, backing, kind, decimals, symbol, href }: { label: string; value: bigint; scale: bigint; backing: bigint; kind: "backing" | "claims"; decimals: number; symbol: string; href: string }) {
+function Bar({ label, value, scale, backing, kind, decimals, symbol, href, source }: { label: string; value: bigint; scale: bigint; backing: bigint; kind: "backing" | "claims"; decimals: number; symbol: string; href: string; source: string }) {
   const pct = (v: bigint) => (scale === 0n ? 0 : Number((v * 10_000n) / scale) / 100);
   const within = kind === "claims" && value > backing ? backing : value;
   const overflow = kind === "claims" && value > backing ? value - backing : 0n;
@@ -79,7 +79,7 @@ function Bar({ label, value, scale, backing, kind, decimals, symbol, href }: { l
     <div>
       <div className="mb-1.5 flex items-baseline justify-between gap-3 text-xs">
         <span className="font-medium text-muted">{label}</span>
-        <Verifiable href={href} label={`${label}: ${formatAmount(value, { decimals })} ${symbol}`} className="font-mono text-sm text-fg">
+        <Verifiable href={href} label={`${label}: ${formatAmount(value, { decimals })} ${symbol}, ${source}`} className="font-mono text-sm text-fg">
           {formatAmount(value, { decimals, maxFraction: 0 })}
         </Verifiable>
       </div>
@@ -119,8 +119,8 @@ export function ConservationMeter({ status }: { status: TokenStatusResponse }) {
   return (
     <div className="flex flex-col gap-4 px-4 pb-4 pt-3">
       <div className="relative flex flex-col gap-3">
-        <Bar label="Backing" value={backing} scale={scale} backing={backing} kind="backing" decimals={token.decimals} symbol={token.symbol} href={escrowHref} />
-        <Bar label="Claims" value={claims} scale={scale} backing={backing} kind="claims" decimals={token.decimals} symbol={token.symbol} href={ledgerHref} />
+        <Bar label="Backing" value={backing} scale={scale} backing={backing} kind="backing" decimals={token.decimals} symbol={token.symbol} href={escrowHref} source={home?.contracts.escrow ? "escrow balance on the explorer" : "read ConservationLedger onchain"} />
+        <Bar label="Claims" value={claims} scale={scale} backing={backing} kind="claims" decimals={token.decimals} symbol={token.symbol} href={ledgerHref} source="read ConservationLedger onchain" />
         <div aria-hidden="true" className="pointer-events-none absolute bottom-0 top-5 w-px bg-fg/50 transition-[left] duration-700" style={{ left: `${markerPct}%` }} />
       </div>
       {hasEpoch(token) ? (
@@ -136,7 +136,15 @@ export function ConservationMeter({ status }: { status: TokenStatusResponse }) {
           : delta < 0n
           ? "Claims exceed backing. Value was created with no matching debit."
           : surplus > 0n
-            ? `Backing exceeds claims by ${formatAmount(surplus, { decimals: token.decimals })} ${token.symbol}: unclaimed surplus (escrow donation).`
+            ? (
+                <>
+                  Backing exceeds claims by{" "}
+                  <Verifiable href={escrowHref} label={`Unclaimed surplus ${formatAmount(surplus, { decimals: token.decimals })} ${token.symbol}, escrow balance on the explorer`} className="font-mono text-fg">
+                    {formatAmount(surplus, { decimals: token.decimals })}
+                  </Verifiable>{" "}
+                  {token.symbol}: unclaimed surplus (escrow donation).
+                </>
+              )
             : "Backing covers remote supply plus everything in flight."}
       </p>
     </div>

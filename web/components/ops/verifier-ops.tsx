@@ -9,7 +9,7 @@ import { blockUrl, txRefUrl } from "@/lib/explorer";
 import { formatAge, formatTime, secondsBetween } from "@/lib/format";
 import { Banner } from "@/components/kh/banner";
 import { EmptyState, Panel, PanelHeader } from "@/components/kh/panel";
-import { TxLink, Verifiable } from "@/components/kh/links";
+import { SourcedFigure, TxLink, Verifiable, publicUrl } from "@/components/kh/links";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Segmented } from "@/components/ui/tabs";
@@ -29,29 +29,11 @@ const OUTCOME_STYLE: Record<CreRun["outcome"], string> = {
   noop: "text-muted",
 };
 
-/** Only a real http(s) URL counts as a public source; anything else is marked, never faked as a link. */
-function publicUrl(url: string | null | undefined): string | null {
-  return url && /^https?:\/\//.test(url) ? url : null;
-}
-
 /**
  * Every Ops figure goes through this: a link to the source it was computed from (verdict rows,
  * Judge /metrics, an explorer block or tx), or a plain number explicitly marked "not public".
  */
-function Fig({ href, label, children, className }: { href: string | null; label: string; children: React.ReactNode; className?: string }) {
-  if (href) {
-    return (
-      <Verifiable href={href} label={label} className={className ?? ""}>
-        <span data-figure="">{children}</span>
-      </Verifiable>
-    );
-  }
-  return (
-    <span data-figure="" data-not-public="" title={`${label}. Source not public`} className={className}>
-      {children}
-    </span>
-  );
-}
+const Fig = SourcedFigure;
 
 function NotPublic() {
   return <span className="ml-1.5 font-sans text-2xs font-normal tracking-normal text-subtle">not public</span>;

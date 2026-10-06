@@ -38,16 +38,16 @@ export function LedgerTable({ status, onOpenChain }: { status: TokenStatusRespon
           </span>
         </th>
         <td className="px-2 text-right">
-          <Amount value={c.supply} decimals={d} href={tokenUrl(c.chain, c.contracts.token)} label={`${CHAINS[c.chain].name} supply, token contract`} />
+          <Amount value={c.supply} decimals={d} href={tokenUrl(c.chain, c.contracts.token)} label={`${CHAINS[c.chain].name} supply, token totalSupply on the explorer`} />
         </td>
         <td className="px-2 text-right">
-          <Amount value={c.escrow} decimals={d} href={c.contracts.escrow ? escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow) : ledgerRead} label={`${CHAINS[c.chain].name} escrow balance`} />
+          <Amount value={c.escrow} decimals={d} href={c.contracts.escrow ? escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow) : ledgerRead} label={`${CHAINS[c.chain].name} escrow balance on the explorer`} />
         </td>
         <td className="px-2 text-right">
-          <Amount value={inFlight} decimals={d} href={ledgerRead} label={`${CHAINS[c.chain].name} in flight, ledger read`} />
+          <Amount value={inFlight} decimals={d} href={ledgerRead} label={`${CHAINS[c.chain].name} in flight, read ConservationLedger onchain`} />
         </td>
         <td className="px-2 text-right">
-          <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label={`Pinned block ${c.pinnedBlock.number} on ${CHAINS[c.chain].name}`} className="font-mono text-xs text-muted">
+          <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label={`Pinned block ${c.pinnedBlock.number} on ${CHAINS[c.chain].name}, block on the explorer`} className="font-mono text-xs text-muted">
             {Number(c.pinnedBlock.number).toLocaleString("en-US")}
           </Verifiable>
         </td>
@@ -75,23 +75,23 @@ export function LedgerTable({ status, onOpenChain }: { status: TokenStatusRespon
               <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                 <dt className="text-subtle">Supply</dt>
                 <dd className="text-right">
-                  <Amount value={c.supply} decimals={d} href={tokenUrl(c.chain, c.contracts.token)} label={`${CHAINS[c.chain].name} supply`} />
+                  <Amount value={c.supply} decimals={d} href={tokenUrl(c.chain, c.contracts.token)} label={`${CHAINS[c.chain].name} supply, token totalSupply on the explorer`} />
                 </dd>
                 {c.escrow !== null ? (
                   <>
                     <dt className="text-subtle">Escrow</dt>
                     <dd className="text-right">
-                      <Amount value={c.escrow} decimals={d} href={c.contracts.escrow ? escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow) : ledgerRead} label="Escrow balance" />
+                      <Amount value={c.escrow} decimals={d} href={c.contracts.escrow ? escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow) : ledgerRead} label={`${CHAINS[c.chain].name} escrow balance on the explorer`} />
                     </dd>
                   </>
                 ) : null}
                 <dt className="text-subtle">In flight</dt>
                 <dd className="text-right">
-                  <Amount value={inFlight} decimals={d} href={ledgerRead} label="In flight, ledger read" />
+                  <Amount value={inFlight} decimals={d} href={ledgerRead} label={`${CHAINS[c.chain].name} in flight, read ConservationLedger onchain`} />
                 </dd>
                 <dt className="text-subtle">Pinned block</dt>
                 <dd className="text-right">
-                  <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label="Pinned block" className="font-mono text-muted">
+                  <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label={`Pinned block ${c.pinnedBlock.number} on ${CHAINS[c.chain].name}, block on the explorer`} className="font-mono text-muted">
                     {Number(c.pinnedBlock.number).toLocaleString("en-US")}
                   </Verifiable>
                 </dd>

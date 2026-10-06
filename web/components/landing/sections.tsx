@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { ArrowRight, Check, Lock, ShieldCheck, X } from "lucide-react";
-import type { ChainSupply, TokenStatusResponse } from "@/lib/api/types";
+import type { ChainSupply, TokenStatusResponse, TxRef } from "@/lib/api/types";
 import { useNow, useTokenStatus } from "@/lib/api/hooks";
 import { CHAINS } from "@/lib/chains";
-import { blockUrl, escrowBalanceUrl, readContractUrl, tokenUrl } from "@/lib/explorer";
+import { blockUrl, escrowBalanceUrl, readContractUrl, tokenUrl, txRefUrl } from "@/lib/explorer";
 import { formatAge, formatAmount, parseWei, secondsBetween } from "@/lib/format";
 import { STATUS_STYLE, hasEpoch } from "@/lib/status";
 import { StatusWord } from "@/components/kh/status";
@@ -283,20 +283,30 @@ function ChainCard({ c, status }: { c: ChainSupply; status: TokenStatusResponse 
         <StatusWord status={c.ledgerStatus} className="text-xs" />
       </div>
       <p className="mt-5 text-xs text-muted">{c.role === "home" ? "Backing in escrow" : "Supply on chain"}</p>
-      <Verifiable href={c.role === "home" && c.contracts.escrow ? escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow) : tokenUrl(c.chain, c.contracts.token)} label={`${CHAINS[c.chain].name} ${c.role === "home" ? "escrow" : "supply"}`} className="mt-1 block font-mono text-xl font-medium text-fg">
+      <Verifiable href={c.role === "home" && c.contracts.escrow ? escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow) : tokenUrl(c.chain, c.contracts.token)} label={c.role === "home" ? `${CHAINS[c.chain].name} escrow balance on the explorer` : `${CHAINS[c.chain].name} supply, token totalSupply on the explorer`} className="mt-1 block font-mono text-xl font-medium text-fg">
         {formatAmount(parseWei(c.role === "home" && c.escrow !== null ? c.escrow : c.supply), { decimals: t.decimals, maxFraction: 0 })}
         <span className="ml-1.5 font-sans text-sm font-normal text-muted">{t.symbol}</span>
       </Verifiable>
       <div className="mt-4 flex items-center justify-between text-xs text-subtle">
         <span>
           pinned{" "}
-          <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label="Pinned block" className="font-mono text-muted">
+          <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label={`Pinned block ${c.pinnedBlock.number} on ${CHAINS[c.chain].name}, block on the explorer`} className="font-mono text-muted">
             #{Number(c.pinnedBlock.number).toLocaleString("en-US")}
           </Verifiable>
         </span>
         <span>{c.frozen ? <span className="inline-flex items-center gap-1 text-quarantined"><Lock className="size-3" aria-hidden="true" /> lanes frozen</span> : c.read.ok ? c.confidence : <span className="text-drift">RPC down</span>}</span>
       </div>
     </div>
+  );
+}
+
+function EpochFigure({ tx, label, children }: { tx: TxRef | undefined; label: string; children: React.ReactNode }) {
+  return tx ? (
+    <Verifiable href={txRefUrl(tx)} label={label} className="font-mono text-fg">
+      {children}
+    </Verifiable>
+  ) : (
+    <span className="font-mono text-fg">{children}</span>
   );
 }
 
@@ -312,8 +322,14 @@ export function LiveCircuit({ token = "kETH" }: { token?: string }) {
           <span className="text-sm text-unknown-text">No epoch yet</span>
         ) : st ? (
           <span className="text-sm text-muted">
-            Epoch <span className="font-mono text-fg">{Number(st.token.epochId).toLocaleString("en-US")}</span> · checked{" "}
-            <span className="font-mono text-fg">{now === 0 ? "just now" : `${formatAge(secondsBetween(st.token.updatedAt, now))} ago`}</span>
+            Epoch{" "}
+            <EpochFigure tx={st.epoch?.reportTxs[0]} label={`Epoch ${st.token.epochId}, its report transaction on the explorer`}>
+              {Number(st.token.epochId).toLocaleString("en-US")}
+            </EpochFigure>{" "}
+            · checked{" "}
+            <EpochFigure tx={st.epoch?.reportTxs[0]} label="Last check, the latest epoch report transaction on the explorer">
+              {now === 0 ? "just now" : `${formatAge(secondsBetween(st.token.updatedAt, now))} ago`}
+            </EpochFigure>
           </span>
         ) : null}
       </div>
@@ -330,7 +346,7 @@ export function LiveCircuit({ token = "kETH" }: { token?: string }) {
         {st ? (
           <span className="flex items-baseline gap-2">
             <span className="font-mono text-lg text-subtle">Δ</span>
-            <Verifiable href={readContractUrl(st.ledger.chain, st.ledger.address)} label="Δ, read the ledger onchain" className={cn("font-mono text-xl font-medium tnum", parseWei(st.token.delta) < 0n ? "text-broken" : "text-fg")}>
+            <Verifiable href={readContractUrl(st.ledger.chain, st.ledger.address)} label={`Δ ${formatAmount(parseWei(st.token.delta), { decimals: st.token.decimals, maxFraction: 0, signed: true })} ${st.token.symbol}, read ConservationLedger onchain`} className={cn("font-mono text-xl font-medium tnum", parseWei(st.token.delta) < 0n ? "text-broken" : "text-fg")}>
               {formatAmount(parseWei(st.token.delta), { decimals: st.token.decimals, maxFraction: 0, signed: true })}
             </Verifiable>
             <span className="text-sm text-muted">{st.token.symbol}</span>

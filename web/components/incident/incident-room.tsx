@@ -125,7 +125,7 @@ function Header({ r, decimals }: { r: IncidentResponse; decimals: number }) {
           <div className="mt-1.5 max-w-[70ch] space-y-1 text-sm text-muted">
             <p>
               Loop Rule deficit · claims exceed backing by{" "}
-              <Verifiable href={ledgerRead} label="Deficit, read ConservationLedger onchain" className="font-mono text-fg">
+              <Verifiable href={ledgerRead} label={`Deficit ${formatAmount(parseWei(i.offending.amount), { decimals, maxFraction: 0 })} ${i.token}, read ConservationLedger onchain`} className="font-mono text-fg">
                 {formatAmount(parseWei(i.offending.amount), { decimals, maxFraction: 0 })} {i.token}
               </Verifiable>{" "}
               across the circuit. Opened {formatDateTime(i.openedAt)}
@@ -134,26 +134,42 @@ function Header({ r, decimals }: { r: IncidentResponse; decimals: number }) {
           </div>
         ) : (
           <p className="mt-1.5 max-w-[70ch] text-sm text-muted">
-            <Verifiable href={txRefUrl(i.offending.tx)} label="Offending credit transaction" className="font-mono text-fg">
+            <Verifiable href={txRefUrl(i.offending.tx)} label={`${formatAmount(parseWei(i.offending.amount), { decimals, maxFraction: 0 })} ${i.token}, offending credit transaction on ${CHAINS[i.offending.tx.chain].name}`} className="font-mono text-fg">
               {formatAmount(parseWei(i.offending.amount), { decimals, maxFraction: 0 })} {i.token}
             </Verifiable>{" "}
             credited on {CHAINS[i.offending.chain].name} through {BRIDGE_NAME[i.offending.bridge] ?? i.offending.bridge}, claimed from {CHAINS[i.offending.claimedSrcChain].name}. Opened {formatDateTime(i.openedAt)}
           </p>
         )}
         <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat label="Δ after" hint={`Before ${formatAmount(parseWei(i.deltaBefore), { decimals, signed: true, maxFraction: 0 })}`}>
-            <Verifiable href={ledgerRead} label="Δ after, read ConservationLedger onchain" className={cn("font-num text-2xl leading-none", delta < 0n ? "text-broken" : "text-fg")}>
+          <Stat
+            label="Δ after"
+            hint={
+              <>
+                Before{" "}
+                <Verifiable
+                  href={firstBreach?.tx ? txRefUrl(firstBreach.tx) : ledgerRead}
+                  label={`Δ before ${formatAmount(parseWei(i.deltaBefore), { decimals, signed: true, maxFraction: 0 })} ${i.token}, ${firstBreach?.tx ? "recorded in the first BREACH report transaction" : "read ConservationLedger onchain"}`}
+                  className="font-mono"
+                >
+                  {formatAmount(parseWei(i.deltaBefore), { decimals, signed: true, maxFraction: 0 })}
+                </Verifiable>
+              </>
+            }
+          >
+            <Verifiable href={ledgerRead} label={`Δ after ${formatAmount(delta, { decimals, signed: true, maxFraction: 0 })} ${i.token}, read ConservationLedger onchain`} className={cn("font-num text-2xl leading-none", delta < 0n ? "text-broken" : "text-fg")}>
               {formatAmount(delta, { decimals, signed: true, maxFraction: 0 })}
             </Verifiable>
             <span className="ml-1.5 text-xs text-muted">{i.token}</span>
           </Stat>
           <Stat label={loop ? "Detection to BROKEN" : "Offending block to BROKEN"} hint={`${formatDateTime(i.offendingBlockAt)}`}>
             {firstBreach?.tx ? (
-              <Verifiable href={txRefUrl(firstBreach.tx)} label="First BREACH report transaction" className="font-num text-xl text-fg">
+              <Verifiable href={txRefUrl(firstBreach.tx)} label={`${formatSeconds(i.timeToBrokenSeconds)} to BROKEN, first BREACH report transaction`} className="font-num text-xl text-fg">
                 {formatSeconds(i.timeToBrokenSeconds)}
               </Verifiable>
             ) : (
-              <span className="font-num text-xl text-fg">{formatSeconds(i.timeToBrokenSeconds)}</span>
+              <Verifiable href={txRefUrl(i.offending.tx)} label={`${formatSeconds(i.timeToBrokenSeconds)} to BROKEN, measured from the offending transaction`} className="font-num text-xl text-fg">
+                {formatSeconds(i.timeToBrokenSeconds)}
+              </Verifiable>
             )}
           </Stat>
           <Stat label={loop ? "Home BREACH report" : "Offending credit"} hint={`Recipient ${orNa(i.offending.recipient, (a) => shortHash(a))}`}>

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import type { Address, ChainKey, TxRef } from "@/lib/api/types";
 import { addressUrl, readContractUrl, shortHash, txRefUrl } from "@/lib/explorer";
@@ -47,14 +47,17 @@ export function AddressLink({ chain, address, className, read = false }: { chain
  * A number backed by an onchain fact. Every figure in the UI goes through this so it is one
  * click from its explorer tx or contract read (PRD section 12, "Every number is verifiable").
  */
-export function Verifiable({ href, label, children, className }: { href: string; label: string; children: ReactNode; className?: string }) {
+export function Verifiable({ href, label, children, className, style }: { href: string; label: string; children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
     <a
       href={href}
+      style={style}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={label}
       title={label}
+      data-figure=""
+      data-source={label}
       className={cn(
         "rounded-sm tnum underline decoration-dotted decoration-transparent decoration-1 underline-offset-4 transition-[text-decoration-color] hover:decoration-[color-mix(in_oklab,currentColor_55%,transparent)] focus-visible:decoration-current",
         className,
@@ -62,5 +65,29 @@ export function Verifiable({ href, label, children, className }: { href: string;
     >
       {children}
     </a>
+  );
+}
+
+/** Only a real http(s) URL counts as a public source; anything else is marked, never faked as a link. */
+export function publicUrl(url: string | null | undefined): string | null {
+  return url && /^https?:\/\//.test(url) ? url : null;
+}
+
+/**
+ * A figure computed offchain (Judge latency, cell agreement): it links to the rows or metrics it
+ * was computed from, or, when that source is not public, says so instead of faking a link.
+ */
+export function SourcedFigure({ href, label, children, className }: { href: string | null; label: string; children: ReactNode; className?: string }) {
+  if (href) {
+    return (
+      <Verifiable href={href} label={label} className={className ?? ""}>
+        {children}
+      </Verifiable>
+    );
+  }
+  return (
+    <span data-figure="" data-not-public="" data-source={label} title={`${label}. Source not public`} className={className}>
+      {children}
+    </span>
   );
 }

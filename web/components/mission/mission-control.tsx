@@ -10,6 +10,8 @@ import { CHAINS } from "@/lib/chains";
 import { formatAge, secondsBetween } from "@/lib/format";
 import { isBreached } from "@/lib/status";
 import { Banner } from "@/components/kh/banner";
+import { Verifiable } from "@/components/kh/links";
+import { blockUrl, txRefUrl } from "@/lib/explorer";
 import { EmptyState, Panel, PanelHeader } from "@/components/kh/panel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,9 +42,18 @@ function StaleBanner({ status }: { status: TokenStatusResponse }) {
     );
   }
   const age = now === 0 ? 0 : secondsBetween(status.token.updatedAt, now);
+  const epochTx = status.epoch?.reportTxs[0];
   return (
     <Banner tone="stale">
-      Last epoch {formatAge(age)} ago. Verdicts follow the token&apos;s stale policy.
+      Last epoch{" "}
+      {epochTx ? (
+        <Verifiable href={txRefUrl(epochTx)} label={`Last epoch ${formatAge(age)} ago, its report transaction on the explorer`} className="font-mono">
+          {formatAge(age)}
+        </Verifiable>
+      ) : (
+        formatAge(age)
+      )}{" "}
+      ago. Verdicts follow the token&apos;s stale policy.
     </Banner>
   );
 }
@@ -70,7 +81,16 @@ function StateBanners({ status, apiError, onRetry }: { status: TokenStatusRespon
         c.read.ok ? null : (
           <Banner key={c.chain} tone="error">
             <span className="font-medium">{CHAINS[c.chain].name} RPC error:</span> {c.read.error}.{" "}
-            {c.read.lastGoodBlock ? `Its values are from block ${Number(c.read.lastGoodBlock.number).toLocaleString("en-US")}. ` : ""}The other chains stay live.
+            {c.read.lastGoodBlock ? (
+              <>
+                Its values are from block{" "}
+                <Verifiable href={blockUrl(c.chain, c.read.lastGoodBlock.number)} label={`Last good block ${c.read.lastGoodBlock.number} on ${CHAINS[c.chain].name}, block on the explorer`} className="font-mono">
+                  {Number(c.read.lastGoodBlock.number).toLocaleString("en-US")}
+                </Verifiable>
+                .{" "}
+              </>
+            ) : null}
+            The other chains stay live.
           </Banner>
         ),
       )}
@@ -188,7 +208,21 @@ function MissionControlLive({ token, variant }: { token: string; variant: "full"
             </div>
             <div className="grid min-h-0 grid-cols-1 gap-3 xl:col-span-2 xl:grid-cols-2">
               <Panel className={cn("min-h-[240px] overflow-hidden xl:min-h-0", stale && "is-stale")} aria-labelledby="ledger-title">
-                <PanelHeader id="ledger-title" title="Ledger" meta={data?.epoch && hasEpoch(data.token) ? `Epoch ${Number(data.epoch.epochId).toLocaleString("en-US")} pinned blocks` : undefined} />
+                <PanelHeader id="ledger-title" title="Ledger" meta={
+                    data?.epoch && hasEpoch(data.token) ? (
+                      <>
+                        Epoch{" "}
+                        {data.epoch.reportTxs[0] ? (
+                          <Verifiable href={txRefUrl(data.epoch.reportTxs[0])} label={`Epoch ${data.epoch.epochId}, its report transaction on the explorer`}>
+                            {Number(data.epoch.epochId).toLocaleString("en-US")}
+                          </Verifiable>
+                        ) : (
+                          Number(data.epoch.epochId).toLocaleString("en-US")
+                        )}{" "}
+                        pinned blocks
+                      </>
+                    ) : undefined
+                  } />
                 {data ? <LedgerTable status={data} onOpenChain={openChain} /> : <LedgerTableSkeleton />}
               </Panel>
               <Panel className={cn("min-h-[240px] overflow-hidden xl:min-h-0", stale && "is-stale")} aria-labelledby="history-title">

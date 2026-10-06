@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, ArrowUpRight, RefreshCw, SearchX } from "lucide-react";
-import type { TokenStatus, TokenStatusResponse } from "@/lib/api/types";
+import type { ChainSupply, TokenStatus, TokenStatusResponse } from "@/lib/api/types";
 import { isApiError } from "@/lib/api/client";
 import { useNow, useTokenStatus, useTokenStream } from "@/lib/api/hooks";
 import { CHAINS } from "@/lib/chains";
-import { blockUrl, readContractUrl, tokenUrl, txRefUrl } from "@/lib/explorer";
+import { blockUrl, escrowBalanceUrl, readContractUrl, tokenUrl, txRefUrl } from "@/lib/explorer";
 import { formatAge, formatAgeWords, formatAmount, parseWei, secondsBetween } from "@/lib/format";
 import { STATUS_STYLE, isBreached, hasEpoch, NO_EPOCH_BANNER } from "@/lib/status";
 import { SpecProposalAlert } from "@/components/kh/spec-proposal-alert";
@@ -23,6 +23,11 @@ import { DeltaReadout } from "@/components/mission/conservation-meter";
 import { VerifyOnchainButton } from "@/components/mission/ledger-drawer";
 import { CopyButton } from "@/components/integrate/copy-button";
 import { cn } from "@/lib/utils";
+
+/** Escrow balance on the explorer's token page, or the ledger read when no escrow adapter exists. */
+function escrowHref(c: ChainSupply): string {
+  return c.contracts.escrow ? escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow) : readContractUrl(c.chain, c.contracts.ledger);
+}
 
 /** Hero line. PRD microcopy: "kETH adds up across 3 chains. Last checked 12 seconds ago." */
 export function heroCopy(status: TokenStatusResponse, ageSeconds: number): string {
@@ -136,13 +141,13 @@ function SupplyTable({ status }: { status: TokenStatusResponse }) {
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
               <dt className="text-muted">{c.role === "home" ? "Escrow" : "Supply"}</dt>
               <dd className="text-right">
-                <Verifiable href={c.role === "home" ? readContractUrl(c.chain, c.contracts.ledger) : tokenUrl(c.chain, c.contracts.token)} label={`${CHAINS[c.chain].name} ${c.role === "home" ? "escrow" : "supply"}`} className="font-mono text-fg">
+                <Verifiable href={c.role === "home" ? escrowHref(c) : tokenUrl(c.chain, c.contracts.token)} label={c.role === "home" ? `${CHAINS[c.chain].name} escrow balance on the explorer` : `${CHAINS[c.chain].name} supply, token totalSupply on the explorer`} className="font-mono text-fg">
                   {formatAmount(parseWei(c.role === "home" ? (c.escrow ?? "0") : c.supply), { decimals: d, maxFraction: 0 })}
                 </Verifiable>
               </dd>
               <dt className="text-muted">Pinned block</dt>
               <dd className="text-right">
-                <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label="Pinned block" className="font-mono text-muted">
+                <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label={`Pinned block ${c.pinnedBlock.number} on ${CHAINS[c.chain].name}, block on the explorer`} className="font-mono text-muted">
                   {Number(c.pinnedBlock.number).toLocaleString("en-US")}
                 </Verifiable>
               </dd>
@@ -182,7 +187,7 @@ function SupplyTable({ status }: { status: TokenStatusResponse }) {
                   <span className="ml-2 text-xs text-subtle">{c.role}</span>
                 </th>
                 <td className="px-3 text-right">
-                  <Verifiable href={tokenUrl(c.chain, c.contracts.token)} label={`${CHAINS[c.chain].name} supply`} className="font-mono text-fg">
+                  <Verifiable href={tokenUrl(c.chain, c.contracts.token)} label={`${CHAINS[c.chain].name} supply, token totalSupply on the explorer`} className="font-mono text-fg">
                     {formatAmount(parseWei(c.supply), { decimals: d, maxFraction: 0 })}
                   </Verifiable>
                 </td>
@@ -190,13 +195,13 @@ function SupplyTable({ status }: { status: TokenStatusResponse }) {
                   {c.escrow === null ? (
                     <span className="text-subtle">n/a</span>
                   ) : (
-                    <Verifiable href={readContractUrl(c.chain, c.contracts.ledger)} label="Escrow, ledger read" className="font-mono text-fg">
+                    <Verifiable href={escrowHref(c)} label={`${CHAINS[c.chain].name} escrow balance on the explorer`} className="font-mono text-fg">
                       {formatAmount(parseWei(c.escrow), { decimals: d, maxFraction: 0 })}
                     </Verifiable>
                   )}
                 </td>
                 <td className="hidden px-3 text-right md:table-cell">
-                  <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label="Pinned block" className="font-mono text-xs text-muted">
+                  <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label={`Pinned block ${c.pinnedBlock.number} on ${CHAINS[c.chain].name}, block on the explorer`} className="font-mono text-xs text-muted">
                     {Number(c.pinnedBlock.number).toLocaleString("en-US")}
                   </Verifiable>
                 </td>
@@ -285,7 +290,7 @@ function Hero({ status }: { status: TokenStatusResponse }) {
             {!hasEpoch(t) ? (
               <span className="font-sans text-unknown-text">No epoch yet</span>
             ) : epochTx ? (
-              <Verifiable href={txRefUrl(epochTx)} label="Latest epoch report transaction">
+              <Verifiable href={txRefUrl(epochTx)} label={`Last epoch ${formatAge(age)} ago, its report transaction on the explorer`}>
                 {formatAge(age)} ago
               </Verifiable>
             ) : (
@@ -295,7 +300,19 @@ function Hero({ status }: { status: TokenStatusResponse }) {
         </div>
         <div className="flex items-center gap-1.5">
           <dt>Epoch</dt>
-          <dd className="font-mono text-fg tnum">{status.epoch && hasEpoch(t) ? Number(status.epoch.epochId).toLocaleString("en-US") : "none"}</dd>
+          <dd className="font-mono text-fg tnum">
+            {status.epoch && hasEpoch(t) ? (
+              epochTx ? (
+                <Verifiable href={txRefUrl(epochTx)} label={`Epoch ${status.epoch.epochId}, its report transaction on the explorer`}>
+                  {Number(status.epoch.epochId).toLocaleString("en-US")}
+                </Verifiable>
+              ) : (
+                Number(status.epoch.epochId).toLocaleString("en-US")
+              )
+            ) : (
+              "none"
+            )}
+          </dd>
         </div>
         <div className="flex items-center gap-1.5">
           <dt>Stale policy</dt>
@@ -379,7 +396,15 @@ export function StatusPage({ token }: { token: string }) {
                 </Banner>
               ) : data?.token.stale ? (
                 <Banner tone="stale">
-                  Last epoch {formatAge(now === 0 ? 0 : secondsBetween(data.token.updatedAt, now))} ago. Verdicts follow the token&apos;s stale policy.
+                  Last epoch{" "}
+                  {data.epoch?.reportTxs[0] ? (
+                    <Verifiable href={txRefUrl(data.epoch.reportTxs[0])} label="Last epoch, its report transaction on the explorer" className="font-mono">
+                      {formatAge(now === 0 ? 0 : secondsBetween(data.token.updatedAt, now))}
+                    </Verifiable>
+                  ) : (
+                    formatAge(now === 0 ? 0 : secondsBetween(data.token.updatedAt, now))
+                  )}{" "}
+                  ago. Verdicts follow the token&apos;s stale policy.
                 </Banner>
               ) : null}
               {data ? <SpecProposalAlert token={data.token.symbol} /> : null}
@@ -399,7 +424,7 @@ export function StatusPage({ token }: { token: string }) {
               <p className="text-center text-xs text-subtle">
                 Mirror of onchain state. Source: ConservationLedger on {data ? CHAINS[data.ledger.chain].name : "the home chain"}, block{" "}
                 {data ? (
-                  <Verifiable href={blockUrl(data.block.chain, data.block.number)} label="Block the mirror read" className="font-mono">
+                  <Verifiable href={blockUrl(data.block.chain, data.block.number)} label={`Block ${data.block.number}, the block the mirror read, on the explorer`} className="font-mono">
                     {Number(data.block.number).toLocaleString("en-US")}
                   </Verifiable>
                 ) : (

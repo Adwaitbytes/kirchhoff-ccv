@@ -55,7 +55,8 @@ function LiveStatus() {
         <Icon className="size-4" aria-hidden="true" />
         {t.status}
       </span>
-      <span className="truncate font-mono text-fg tnum">
+      {/* The pill is a door to the status page, where every figure links to its onchain read. */}
+      <span className="truncate font-mono text-fg tnum" {...(hasEpoch(t) ? { "data-figure": "", "data-source": "Public status page, where Δ links to the ConservationLedger read" } : {})}>
         {hasEpoch(t) ? `${t.symbol} Δ ${formatAmount(parseWei(t.delta), { decimals: t.decimals, maxFraction: 0, signed: true })}` : t.symbol}
       </span>
       <span className="hidden truncate text-muted sm:inline">{!hasEpoch(t) ? "no epoch yet" : age === null ? "" : `checked ${formatAge(age)} ago`}</span>
@@ -126,7 +127,7 @@ function HeroScene() {
                 </div>
                 <Verifiable
                   href={c.role === "home" && c.contracts.escrow ? escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow) : tokenUrl(c.chain, c.contracts.token)}
-                  label={`${CHAINS[c.chain].name} ${c.role === "home" ? "escrow" : "supply"}`}
+                  label={c.role === "home" ? `${CHAINS[c.chain].name} escrow balance on the explorer` : `${CHAINS[c.chain].name} supply, token totalSupply on the explorer`}
                   className="block font-mono text-[15px] text-fg sm:text-lg lg:mt-1.5"
                 >
                   {formatAmount(parseWei(c.role === "home" && c.escrow !== null ? c.escrow : c.supply), { decimals: data.token.decimals, maxFraction: 0 })}

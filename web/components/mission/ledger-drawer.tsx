@@ -3,7 +3,7 @@
 import { ArrowRight, CheckCircle2, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { ChainKey, TokenStatusResponse } from "@/lib/api/types";
 import { CHAINS } from "@/lib/chains";
-import { blockUrl, escrowBalanceUrl, readContractUrl, tokenUrl } from "@/lib/explorer";
+import { blockUrl, escrowBalanceUrl, readContractUrl, tokenUrl, txRefUrl } from "@/lib/explorer";
 import { formatAmount, formatDateTime, formatTime, parseWei } from "@/lib/format";
 import { useVerifyLedger } from "@/lib/onchain";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -44,7 +44,16 @@ export function VerifyOnchainButton({ status, chain }: { status: TokenStatusResp
         <p className={`flex items-center gap-1.5 text-xs ${matches ? "text-conserved" : "text-drift"}`} role="status">
           {matches ? <CheckCircle2 className="size-3.5" aria-hidden="true" /> : <TriangleAlert className="size-3.5" aria-hidden="true" />}
           statusOf: {r.status}, Δ {formatAmount(r.delta, { decimals: status.token.decimals, signed: true })}
-          {r.via === "rpc" ? ` at block ${r.blockNumber.toString()}` : " (fixture read, no live contract)"}
+          {r.via === "rpc" ? (
+            <>
+              {" "}at block{" "}
+              <Verifiable href={blockUrl(chain, r.blockNumber.toString())} label={`Read at block ${r.blockNumber.toString()} on ${CHAINS[chain].name}, block on the explorer`} className="font-mono">
+                {r.blockNumber.toString()}
+              </Verifiable>
+            </>
+          ) : (
+            " (fixture read, no live contract)"
+          )}
           {matches ? ". Matches the mirror." : ". Differs from the mirror."}
         </p>
       ) : null}
@@ -79,29 +88,29 @@ export function LedgerDrawer({ status, chain, onClose, returnFocusTo }: { status
             </div>
             <dl className="divide-y divide-wire/70 border-y border-wire/70">
               <Field label={c.role === "home" ? "Circulating outside escrow" : "Supply"}>
-                <Verifiable href={tokenUrl(c.chain, c.contracts.token)} label="Token contract" className="font-mono">
+                <Verifiable href={tokenUrl(c.chain, c.contracts.token)} label={`${CHAINS[c.chain].name} supply, token totalSupply on the explorer`} className="font-mono">
                   {formatAmount(parseWei(c.supply), { decimals: d })} {sym}
                 </Verifiable>
               </Field>
               {c.escrow !== null && c.contracts.escrow ? (
                 <Field label="Escrow (backing)">
-                  <Verifiable href={escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow)} label="Escrow balance" className="font-mono">
+                  <Verifiable href={escrowBalanceUrl(c.chain, c.contracts.token, c.contracts.escrow)} label={`${CHAINS[c.chain].name} escrow balance on the explorer`} className="font-mono">
                     {formatAmount(parseWei(c.escrow), { decimals: d })} {sym}
                   </Verifiable>
                 </Field>
               ) : null}
               <Field label="In flight out">
-                <Verifiable href={readContractUrl(c.chain, c.contracts.ledger)} label="Ledger read" className="font-mono">
+                <Verifiable href={readContractUrl(c.chain, c.contracts.ledger)} label="In flight out, read ConservationLedger onchain" className="font-mono">
                   {formatAmount(parseWei(c.inFlightOut), { decimals: d })}
                 </Verifiable>
               </Field>
               <Field label="In flight in">
-                <Verifiable href={readContractUrl(c.chain, c.contracts.ledger)} label="Ledger read" className="font-mono">
+                <Verifiable href={readContractUrl(c.chain, c.contracts.ledger)} label="In flight in, read ConservationLedger onchain" className="font-mono">
                   {formatAmount(parseWei(c.inFlightIn), { decimals: d })}
                 </Verifiable>
               </Field>
               <Field label="Pinned block">
-                <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label="Block" className="font-mono">
+                <Verifiable href={blockUrl(c.chain, c.pinnedBlock.number)} label={`Pinned block ${c.pinnedBlock.number} on ${CHAINS[c.chain].name}, block on the explorer`} className="font-mono">
                   {Number(c.pinnedBlock.number).toLocaleString("en-US")}
                 </Verifiable>
                 <span className="ml-2 text-xs text-subtle">{formatDateTime(c.pinnedBlock.timestamp)}</span>
@@ -149,7 +158,13 @@ export function LedgerDrawer({ status, chain, onClose, returnFocusTo }: { status
                           {CHAINS[t.dstChain].short}
                         </span>
                         <span className={t.state === "forged" || t.state === "refused" ? "text-broken" : "text-subtle"}>{t.state.replace("_", " ")}</span>
-                        <span className="ml-auto font-mono text-fg">{formatAmount(parseWei(t.amount), { decimals: d })}</span>
+                        {tx ? (
+                          <Verifiable href={txRefUrl(tx)} label={`${formatAmount(parseWei(t.amount), { decimals: d })} ${sym}, transfer transaction on ${CHAINS[tx.chain].name}`} className="ml-auto font-mono text-fg">
+                            {formatAmount(parseWei(t.amount), { decimals: d })}
+                          </Verifiable>
+                        ) : (
+                          <span className="ml-auto font-mono text-fg">{formatAmount(parseWei(t.amount), { decimals: d })}</span>
+                        )}
                         {tx ? <TxLink tx={tx} /> : null}
                       </li>
                     );

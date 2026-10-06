@@ -6,11 +6,12 @@ import { ArrowRight, Lock, Sigma, TriangleAlert } from "lucide-react";
 import type { ChainKey, LaneTransfer, TokenStatus, TokenStatusResponse } from "@/lib/api/types";
 import { CHAINS } from "@/lib/chains";
 import { formatAmount, formatCompact, formatTime, parseWei } from "@/lib/format";
-import { shortHash, txRefUrl } from "@/lib/explorer";
+import { blockUrl, escrowBalanceUrl, readContractUrl, shortHash, tokenUrl, txRefUrl } from "@/lib/explorer";
 import { onTransfer, type TransferEvent } from "@/lib/api/hooks";
 import { usePrefs } from "@/lib/prefs";
 import { STATUS_STYLE, isBreached } from "@/lib/status";
 import { StatusWord } from "@/components/kh/status";
+import { Verifiable } from "@/components/kh/links";
 import { cn } from "@/lib/utils";
 import { groupLanes, layoutFor, roundedPath, routeWires, type Dims, type Point, type WireGroup } from "@/components/mission/geometry";
 
@@ -28,6 +29,8 @@ interface ChainNodeData extends Record<string, unknown> {
   frozen: boolean;
   readError: string | null;
   pinnedBlock: string;
+  supplyHref: string;
+  blockHref: string;
   dims: Dims;
   compact: boolean;
   onOpen: (chain: ChainKey) => void;
@@ -36,6 +39,9 @@ interface ChainNodeData extends Record<string, unknown> {
 interface EscrowNodeData extends Record<string, unknown> {
   backing: bigint;
   claims: bigint;
+  backingHref: string;
+  backingSource: string;
+  claimsHref: string;
   symbol: string;
   decimals: number;
   status: TokenStatus;
@@ -65,6 +71,7 @@ interface WireData extends Record<string, unknown> {
   reducedMotion: boolean;
   motionScale: number;
   decimals: number;
+  symbol: string;
   hovered: boolean;
   compact: boolean;
   onHover: (id: string | null) => void;
@@ -103,6 +110,19 @@ function Pins({ side, count }: { side: "top" | "bottom" | "left" | "right"; coun
   );
 }
 
+/** Figures inside a node: clickable above the card's own button, never dragging the canvas. */
+const figureLink = "nodrag nopan pointer-events-auto relative inline-flex items-center";
+
+/**
+ * fitView scales the schematic down (to about 0.45 in the Lab), so a small figure link grows its
+ * hit area by 1/zoom to stay a 24px target on screen, with negative margins keeping the layout.
+ */
+function hitArea(zoom: number, lineHeightPx: number): React.CSSProperties {
+  const h = Math.ceil(26 / Math.min(zoom, 1));
+  const m = Math.max(0, (h - lineHeightPx) / 2);
+  return { minHeight: h, marginTop: -m, marginBottom: -m };
+}
+
 const nodeSurface =
   "bg-[linear-gradient(180deg,var(--panel-top),var(--bg-panel))] shadow-[inset_0_1px_0_0_var(--panel-highlight),0_1px_2px_rgb(0_0_0/0.35),0_16px_32px_-18px_rgb(0_0_0/0.7)]";
 
@@ -110,6 +130,7 @@ const ChainNodeView = memo(function ChainNodeView({ data }: NodeProps<ChainFlowN
   const meta = CHAINS[data.chain];
   const breached = isBreached(data.status);
   const c = data.compact;
+  const zoom = useStore(zoomSelector);
   return (
     <div style={{ width: data.dims.chainW, height: data.dims.chainH }} className="relative">
       <Handle type="target" position={Position.Top} style={hidden} isConnectable={false} />
@@ -121,18 +142,19 @@ const ChainNodeView = memo(function ChainNodeView({ data }: NodeProps<ChainFlowN
         </>
       ) : null}
       <Pins side={data.role === "home" ? "top" : "bottom"} count={c ? 5 : 7} />
+      {/* The whole card opens the ledger; its figures sit above that button as their own source links. */}
       <button
         type="button"
         onClick={() => data.onOpen(data.chain)}
         aria-label={`${meta.name}: ${formatAmount(data.supply, { decimals: data.decimals })} ${data.symbol}, ${data.status}. Open ledger`}
         className={cn(
-          "nodrag nopan group flex h-full w-full cursor-pointer flex-col rounded-lg border text-left transition-[border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]",
+          "nodrag nopan absolute inset-0 cursor-pointer rounded-lg border transition-[border-color,box-shadow] duration-200 ease-out hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]",
           nodeSurface,
-          c ? "px-3 py-2.5" : "px-4 py-3",
           breached ? "border-broken/40" : "border-wire",
           data.readError && "border-drift/60",
         )}
-      >
+      />
+      <div className={cn("pointer-events-none relative flex h-full w-full flex-col text-left", c ? "px-3 py-2.5" : "px-4 py-3")}>
         <span className="flex items-center gap-2">
           <span className={cn("size-1.5 shrink-0 rounded-full", data.readError ? "bg-drift" : STATUS_STYLE[data.status].bg)} aria-hidden="true" />
           <span className={cn("truncate font-semibold text-fg", c ? "text-xs" : "text-sm")}>{c ? meta.short : meta.name}</span>
@@ -140,7 +162,9 @@ const ChainNodeView = memo(function ChainNodeView({ data }: NodeProps<ChainFlowN
           {data.frozen ? <Lock className={cn("size-3.5 shrink-0 text-quarantined", c && "ml-auto")} aria-label="Lanes frozen" /> : null}
         </span>
         <span className={cn("font-mono font-medium leading-none text-fg tnum", c ? "mt-2 text-sm" : "mt-2.5 text-lg")}>
-          {formatAmount(data.supply, { decimals: data.decimals, maxFraction: 0 })}
+          <Verifiable href={data.supplyHref} label={`${meta.name} supply ${formatAmount(data.supply, { decimals: data.decimals })} ${data.symbol}, token totalSupply on the explorer`} className={figureLink} style={hitArea(zoom, c ? 14 : 18)}>
+            {formatAmount(data.supply, { decimals: data.decimals, maxFraction: 0 })}
+          </Verifiable>
           <span className="ml-1.5 font-sans text-xs font-normal text-muted">{data.symbol}</span>
         </span>
         {!c ? <span className="mt-1 text-xs text-muted">{data.role === "home" ? "Circulating outside escrow" : "Supply on chain"}</span> : null}
@@ -153,9 +177,13 @@ const ChainNodeView = memo(function ChainNodeView({ data }: NodeProps<ChainFlowN
           ) : (
             <StatusWord status={data.status} className={c ? "text-2xs" : "text-xs"} />
           )}
-          {!c ? <span className="ml-auto font-mono text-2xs text-subtle tnum">#{Number(data.pinnedBlock).toLocaleString("en-US")}</span> : null}
+          {!c ? (
+            <Verifiable href={data.blockHref} label={`Pinned block ${data.pinnedBlock} on ${meta.name}, block on the explorer`} className={cn(figureLink, "ml-auto font-mono text-2xs text-subtle")} style={hitArea(zoom, 14)}>
+              #{Number(data.pinnedBlock).toLocaleString("en-US")}
+            </Verifiable>
+          ) : null}
         </span>
-      </button>
+      </div>
     </div>
   );
 });
@@ -164,6 +192,7 @@ const EscrowNodeView = memo(function EscrowNodeView({ data }: NodeProps<EscrowFl
   const breached = isBreached(data.status);
   const style = STATUS_STYLE[data.status];
   const c = data.compact;
+  const zoom = useStore(zoomSelector);
   return (
     <div style={{ width: data.dims.escrowW, height: data.dims.escrowH }} className="relative">
       <Handle type="target" position={Position.Top} style={hidden} isConnectable={false} />
@@ -191,12 +220,12 @@ const EscrowNodeView = memo(function EscrowNodeView({ data }: NodeProps<EscrowFl
         onClick={data.onOpen}
         aria-label={`Home escrow on Ethereum Sepolia backing ${formatAmount(data.backing, { decimals: data.decimals })} ${data.symbol}. Open ledger`}
         className={cn(
-          "nodrag nopan relative flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-xl border-2 text-left transition-[border-color,box-shadow] duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]",
+          "nodrag nopan absolute inset-0 cursor-pointer rounded-xl border-2 transition-[border-color,box-shadow] duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]",
           nodeSurface,
-          c ? "px-3.5 py-3" : "px-5 py-4",
           breached ? "border-broken shadow-[0_0_0_4px_color-mix(in_oklab,var(--status-broken)_14%,transparent),0_20px_48px_-16px_color-mix(in_oklab,var(--status-broken)_45%,transparent)]" : "border-[color-mix(in_oklab,var(--status-conserved)_38%,var(--line-strong))]",
         )}
-      >
+      />
+      <div className={cn("pointer-events-none relative flex h-full w-full flex-col overflow-hidden text-left", c ? "px-3.5 py-3" : "px-5 py-4")}>
         <span className="flex items-center gap-2">
           <span className={cn("flex size-6 items-center justify-center rounded-md", style.soft)}>
             <Sigma className={cn("size-3.5", style.text)} strokeWidth={2.5} aria-hidden="true" />
@@ -205,17 +234,24 @@ const EscrowNodeView = memo(function EscrowNodeView({ data }: NodeProps<EscrowFl
           <span className="ml-auto text-xs text-subtle">{c ? "escrow" : "Home escrow · Sepolia"}</span>
         </span>
         <span className={cn("font-mono font-medium leading-none text-fg tnum", c ? "mt-2.5 text-base" : "mt-3 text-xl")}>
-          {formatAmount(data.backing, { decimals: data.decimals, maxFraction: 0 })}
+          <Verifiable href={data.backingHref} label={`Backing ${formatAmount(data.backing, { decimals: data.decimals })} ${data.symbol}, ${data.backingSource}`} className={figureLink} style={hitArea(zoom, c ? 16 : 20)}>
+            {formatAmount(data.backing, { decimals: data.decimals, maxFraction: 0 })}
+          </Verifiable>
           <span className="ml-1.5 font-sans text-sm font-normal text-muted">{data.symbol}</span>
         </span>
         <span className="mt-1.5 text-xs text-muted">{c ? "Backing" : "Backing locked in HomeEscrowAdapter"}</span>
         {!c ? (
           <span className="mt-auto flex items-center justify-between text-xs text-subtle">
             <span>Σ in = Σ out</span>
-            <span className="font-mono tnum">claims {formatCompact(data.claims, data.decimals)}</span>
+            <span className="font-mono tnum">
+              claims{" "}
+              <Verifiable href={data.claimsHref} label={`Claims ${formatAmount(data.claims, { decimals: data.decimals })} ${data.symbol}, read ConservationLedger onchain`} className={figureLink} style={hitArea(zoom, 16)}>
+                {formatCompact(data.claims, data.decimals)}
+              </Verifiable>
+            </span>
           </span>
         ) : null}
-      </button>
+      </div>
     </div>
   );
 });
@@ -374,9 +410,9 @@ function WireCard({ data }: { data: WireData }) {
                   <span className={cn("ml-1.5", s.cls)}>{s.text}</span>
                 </span>
                 {tx ? (
-                  <a href={txRefUrl(tx)} target="_blank" rel="noopener noreferrer" className="justify-self-end font-mono text-fg tnum hover:underline" title={`${shortHash(tx.hash)} on ${CHAINS[tx.chain].name}`}>
+                  <Verifiable href={txRefUrl(tx)} label={`${amount} ${data.symbol}, transaction ${shortHash(tx.hash)} on ${CHAINS[tx.chain].name}`} className="justify-self-end font-mono text-fg">
                     {amount}
-                  </a>
+                  </Verifiable>
                 ) : (
                   <span className="justify-self-end font-mono text-fg tnum">{amount}</span>
                 )}
@@ -478,6 +514,10 @@ export function CircuitMap({ status, onOpenChain }: { status: TokenStatusRespons
   const openEscrow = useCallback(() => onOpenChain(home), [onOpenChain, home]);
   const backing = parseWei(status.backing);
   const claims = parseWei(status.claims.total);
+  const homeChain = status.chains.find((c) => c.role === "home");
+  const ledgerHref = readContractUrl(status.ledger.chain, status.ledger.address);
+  const backingHref = homeChain?.contracts.escrow ? escrowBalanceUrl(homeChain.chain, homeChain.contracts.token, homeChain.contracts.escrow) : ledgerHref;
+  const backingSource = homeChain?.contracts.escrow ? "escrow balance on the explorer" : "read ConservationLedger onchain";
 
   const nodes = useMemo<AnyNode[]>(() => {
     const d = layout.dims;
@@ -489,7 +529,7 @@ export function CircuitMap({ status, onOpenChain }: { status: TokenStatusRespons
         position: layout.positions.escrow ?? { x: 0, y: 0 },
         draggable: false,
         selectable: false,
-        data: { backing, claims, symbol: token.symbol, decimals: token.decimals, status: token.status, dims: d, compact: layout.compact, calm: reducedMotion, onOpen: openEscrow },
+        data: { backing, claims, backingHref, backingSource, claimsHref: ledgerHref, symbol: token.symbol, decimals: token.decimals, status: token.status, dims: d, compact: layout.compact, calm: reducedMotion, onOpen: openEscrow },
       },
     ];
     for (const c of status.chains) {
@@ -509,6 +549,8 @@ export function CircuitMap({ status, onOpenChain }: { status: TokenStatusRespons
           frozen: c.frozen,
           readError: c.read.ok ? null : c.read.error,
           pinnedBlock: c.pinnedBlock.number,
+          supplyHref: tokenUrl(c.chain, c.contracts.token),
+          blockHref: blockUrl(c.chain, c.pinnedBlock.number),
           dims: d,
           compact: layout.compact,
           onOpen: onOpenChain,
@@ -516,7 +558,7 @@ export function CircuitMap({ status, onOpenChain }: { status: TokenStatusRespons
       });
     }
     return out;
-  }, [status.chains, layout, backing, claims, token, openEscrow, onOpenChain, reducedMotion]);
+  }, [status.chains, layout, backing, claims, backingHref, backingSource, ledgerHref, token, openEscrow, onOpenChain, reducedMotion]);
 
   const edges = useMemo<WireEdgeT[]>(
     () =>
@@ -545,6 +587,7 @@ export function CircuitMap({ status, onOpenChain }: { status: TokenStatusRespons
             reducedMotion,
             motionScale,
             decimals: token.decimals,
+            symbol: token.symbol,
             hovered: hovered === g.id,
             compact: layout.compact,
             onHover: setHovered,
@@ -552,7 +595,7 @@ export function CircuitMap({ status, onOpenChain }: { status: TokenStatusRespons
         };
         return [edge];
       }),
-    [groups, routes, home, status.bridges, pulses, duration, reducedMotion, motionScale, token.decimals, hovered, layout.compact],
+    [groups, routes, home, status.bridges, pulses, duration, reducedMotion, motionScale, token.decimals, token.symbol, hovered, layout.compact],
   );
 
   const d = layout.dims;
