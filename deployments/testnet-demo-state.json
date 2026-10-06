@@ -1,0 +1,17 @@
+{
+  "label": "Testnet simulation",
+  "network": "testnet",
+  "safe": {
+    "address": "0xBc614b7965e4A6c3B3cDB73A1A377434460585aA",
+    "owners": [
+      "0xEEc4494aBb28016E6b35657D644156ECf4d2ca3c",
+      "0x069b0593700A58A4465e07c87160422C7B837849",
+      "0x3e7Ad6A338E26Ee288C347Ab7071436eEeadf6fE"
+    ],
+    "threshold": 2,
+    "saltNonce": "0x359e38b7408e26e0aa23c633212a00efb67cd9fc7b95ef343aa7496301a0483e",
+    "singleton": "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762",
+    "factory": "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67",
+    "fallbackHandler": "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99"
+  }
+}

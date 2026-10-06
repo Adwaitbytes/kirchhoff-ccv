@@ -1,0 +1,68 @@
+{
+  "network": "testnet",
+  "chains": {
+    "ethereum-testnet-sepolia": {
+      "chainId": 11155111,
+      "ledger": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
+      "quarantine": "0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9",
+      "feed": "0x937C381243CA23664bd858fc342fEa7801De5E8e",
+      "registry": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
+      "ccip": {
+        "onRamp": "0x8dcf17f298c881A547D91ca4aA3C2AD7568C6777",
+        "offRamp": "0xc6A246A9AcdAaE651708706494720F79C3E5d0A1",
+        "tokenAdminRegistry": "0x95F29FEE11c5C55d26cCcf1DB6772DE953B37B82"
+      },
+      "tokens": {
+        "kETH": {
+          "token": "0x89767Dab88D356DED2f5e5D153644E08505981c8",
+          "escrow": "0x528Df7b17dc1702772cBc6a2ABD8eBA4E4260191",
+          "lockbox": "0x12BdA4cA9F7C9Ae72B0F7Dae6B85e1a7973D1c08",
+          "bridges": {
+            "ccip": "0xbD6164B658CfE68AD28ffc8053962940d87f20aB",
+            "weakbridge": "0x528Df7b17dc1702772cBc6a2ABD8eBA4E4260191"
+          }
+        }
+      }
+    },
+    "ethereum-testnet-sepolia-arbitrum-1": {
+      "chainId": 421614,
+      "ledger": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
+      "quarantine": "0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9",
+      "feed": "0x937C381243CA23664bd858fc342fEa7801De5E8e",
+      "ccip": {
+        "onRamp": "0x6B9a7cF69F90Ae2659bfe3069fba5Aa308A48cC4",
+        "offRamp": "0xC93218EB7B778bC0c13E5296140C8E4Fa1C440DA",
+        "tokenAdminRegistry": "0x8126bE56454B628a88C17849B9ED99dd5a11Bd2f"
+      },
+      "tokens": {
+        "kETH": {
+          "token": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
+          "bridges": {
+            "ccip": "0x89767Dab88D356DED2f5e5D153644E08505981c8",
+            "weakbridge": "0x50db1f9fDc7c015A46d12E090C2C46B4C842D779"
+          }
+        }
+      }
+    },
+    "ethereum-testnet-sepolia-base-1": {
+      "chainId": 84532,
+      "ledger": "0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA",
+      "quarantine": "0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9",
+      "feed": "0x937C381243CA23664bd858fc342fEa7801De5E8e",
+      "ccip": {
+        "onRamp": "0xA33b221A8427739c76f631a995ca60544bEdD632",
+        "offRamp": "0xa137536A3BFd81aD6f090981268b8C2818451d41",
+        "tokenAdminRegistry": "0x736D0bBb318c1B27Ff686cd19804094E66250e17"
+      },
+      "tokens": {
+        "kETH": {
+          "token": "0x48b5a12B107dd849DD390012aC643F0a29D685AB",
+          "bridges": {
+            "ccip": "0x89767Dab88D356DED2f5e5D153644E08505981c8",
+            "weakbridge": "0x50db1f9fDc7c015A46d12E090C2C46B4C842D779"
+          }
+        }
+      }
+    }
+  }
+}
