@@ -97,11 +97,18 @@ export {
 export { CONTRACT_EVENTS, MULTICALL3, eventTopic, type ContractEvent } from "./contract-events.ts";
 export {
   backtest,
+  replayHistory,
   type BacktestResult,
   type Breach,
   type DriftEvent,
+  type EpochBoundary,
   type EpochObservation,
   type EpochOutcome,
+  type EpochSchedule,
   type HistoryEvent,
   type ObservedSnapshot,
+  type ReplayChain,
+  type ReplayEvent,
+  type ReplayInput,
+  type ReplayResult,
 } from "./backtest.ts";
