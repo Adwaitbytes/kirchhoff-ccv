@@ -30,7 +30,9 @@ export async function genConfig(net: NetworkName): Promise<void> {
   await run("pnpm", ["--filter", "@kirchhoff/workflows", "gen-config", "--target", creTarget(net), "--network", net], { cwd: REPO_ROOT });
 }
 
-const RATE_LIMITED = /429|Too Many Requests|rate limit exceeded/i;
+// Rate limits and pruned state both mean "this provider cannot serve the read": rotate to the next archive-capable one.
+// Arbitrum's finalized block sits ~4,000 blocks deep, beyond what some public endpoints keep.
+const RATE_LIMITED = /429|Too Many Requests|rate limit exceeded|historical state .* is not available|missing trie node|header not found/i;
 /** CRE login checks reach api.cre.chain.link on every run; a timeout there is not a workflow failure. */
 const TRANSIENT = /Credential validation failed|context deadline exceeded|unable to retrieve organization info/;
 
@@ -134,7 +136,7 @@ export async function simulate(
     if (limited) rotation++;
     // An expired CRE session fails every retry the same way; `cre whoami` exchanges the refresh token first.
     if (result.output.includes("Credential validation failed")) await refreshCreSession();
-    log(`  [${workflow}] ${limited ? `RPC rate limited, rotating providers (set ${rotation})` : "CRE login transient"}; retry ${attempt + 1}/7 in ${10 * attempt}s`);
+    log(`  [${workflow}] ${limited ? `provider rate limited or missing state, rotating providers (set ${rotation})` : "CRE login transient"}; retry ${attempt + 1}/7 in ${10 * attempt}s`);
     await new Promise((r) => setTimeout(r, 10_000 * attempt));
     result = await simulateOnce({ ...args, wasm: await wasmFor(workflow, target) }, rotation);
   }
