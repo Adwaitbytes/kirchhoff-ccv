@@ -108,6 +108,22 @@ describe("replayHistory", () => {
     expect(r.epochs.at(-1)?.loop.delta).toBe(0n);
   });
 
+  it("reports a deficit that persists to the head once, where it began", () => {
+    const forged = creditFor(debit({ messageId: hash("forged"), srcChain: HOME, dstChain: ARB, amount: units(4n), recipient: MALLORY }));
+    const forgery = at(ARB, 30n, 30n, "forge");
+    const events = [
+      transfer(forgery, ZERO, MALLORY, units(4n)),
+      creditAt(forgery, forged),
+      transfer(at(ARB, 50n, 50n, "mint-more"), ZERO, MALLORY, units(1n)),
+    ];
+    const r = replayHistory(input(events, { arb: units(5n) }), spec);
+    expect(r.epochs.map((e) => e.loop.status)).toEqual([Status.BROKEN, Status.BROKEN, Status.BROKEN]);
+    expect(r.breaches.map((b) => [b.rule, b.reason, b.at.block])).toEqual([
+      ["loop", Reason.LOOP_DEFICIT, 30n],
+      ["junction", Reason.DEBIT_NOT_FOUND, 100n],
+    ]);
+  });
+
   it("orders same-second blocks debits first, then by spec chain and block, whatever the input order", () => {
     const d = debit({ messageId: hash("tie"), srcChain: HOME, dstChain: ARB, amount: units(2n), recipient: ALICE });
     const lock = at(HOME, 60n, 60n, "lock");

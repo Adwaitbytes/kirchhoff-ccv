@@ -380,6 +380,7 @@ export function replayHistory(input: ReplayInput, spec: TokenSpec): ReplayResult
   const breaches: (Breach & { at: EpochBoundary })[] = [];
   const drift: (DriftEvent & { at: EpochBoundary })[] = [];
   let epochs = 0n;
+  let inLoopBreach = false;
   const close = (at: EpochBoundary, sources: ReadonlyMap<ChainSel, SourceView>): void => {
     epochs++;
     const pinned = [...sources].map(([chain, s]) => ({ chain, block: s.head }));
@@ -389,7 +390,10 @@ export function replayHistory(input: ReplayInput, spec: TokenSpec): ReplayResult
         ? { model: "lock_release_home", epochId: epochs, pinned, supplies, escrow: ledger.escrow }
         : { model: "burn_mint_multi", epochId: epochs, pinned, supplies, issuanceNet: ledger.issuance, reserve: input.reserve };
     const found = tester.epoch({ timestamp: at.timestamp, sources, snapshot });
-    breaches.push(...found.breaches.map((b) => ({ ...b, at })));
+    // A deficit that persists across epochs is one breach, reported where it began.
+    const loopBroken = found.breaches.some((b) => b.rule === "loop");
+    breaches.push(...found.breaches.filter((b) => b.rule === "junction" || !inLoopBreach).map((b) => ({ ...b, at })));
+    inLoopBreach = loopBroken;
     drift.push(...found.drift.map((d) => ({ ...d, at })));
   };
   const midSources = (): Map<ChainSel, SourceView> =>
