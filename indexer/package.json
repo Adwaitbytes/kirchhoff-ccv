@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./db": "./src/db.ts",
     "./notifier": "./src/notifier.ts",
+    "./subscriptions": "./src/subscriptions.ts",
     "./verdicts": "./src/verdicts.ts"
   },
   "bin": {
