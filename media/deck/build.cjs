@@ -36,16 +36,15 @@ const METRICS = {
   bridgeIncidents2026: { value: "14", source: "docs/PRD.md section 1 (DexTools / PeckShield)" },
   creScenarios: { value: "6 / 6", source: "workflows/SIMULATION_LOG.md, scenarios 1 to 6 PASS" },
   w2Reads: { value: "12 / 15", source: "workflows/SIMULATION_LOG.md, 'W2 reads used 12/15'" },
-  judgeP99Stub: { value: "6.13 ms", source: "judge/load/RESULTS.md run A (100 rps, in-process stub RPCs)" },
-  engineBranches: { value: "586 / 586", source: "README.md 'Test results', engine coverage" },
+  judgeP99: { value: "9.31 ms", source: "judge/load/RESULTS.md run D (100 rps, real contracts, two independent RPC providers)" },
+  engineBranches: { value: "764 / 764", source: "pnpm --filter @kirchhoff/engine coverage (328 tests)" },
   prdDone: { value: "350 of 466", source: "PRD_TRACEABILITY.md 'Summary'" },
   testsFoundry: { value: "150", source: "README.md 'Test results' (forge test)" },
   testsTs: { value: "463", source: "SUBMISSION.md 'Judging weights' (pnpm -r test)" },
   // Not measured yet. Kept here so the gap is visible; nothing below may render them.
   demoDuration: { value: PENDING, source: "ffprobe of media/video/kirchhoff-demo.mp4 (filled at build time)" },
-  loopBreachToBroken: { value: PENDING, source: "PRD_TRACEABILITY.md 'Pending measurement' 2.M2" },
-  copilotOnboardTime: { value: PENDING, source: "PRD_TRACEABILITY.md 'Pending measurement' 2.M6" },
-  judgeP99RealRpc: { value: PENDING, source: "PRD_TRACEABILITY.md 'Pending measurement' 2.M4" },
+  loopBreachToBroken: { value: "2 to 4 s", source: "workflows/SIMULATION_LOG.md scenario 7 (after the breach block reaches confidence)" },
+  copilotOnboardTime: { value: "112 s", source: "ai/eval/TESTNET_ONBOARDING.md (live testnet run, 49 of 49 fields)" },
   falseBrokenBacktest: { value: PENDING, source: "PRD_TRACEABILITY.md 'Pending measurement' 2.M3" },
   testnetKelpReplay: { value: PENDING, source: "PRD_TRACEABILITY.md 'Pending work' item 3" },
   resetWallTime: { value: PENDING, source: "PRD_TRACEABILITY.md 'Pending measurement' 15.REC1" },
@@ -685,7 +684,7 @@ function slideWhyChainlink(pres) {
   const cells = [
     [metric("creScenarios"), "PRD scenarios, CRE simulate"],
     [metric("w2Reads"), "CRE reads per W2 run"],
-    [metric("judgeP99Stub"), "Judge p99, 100 rps, stub RPCs"],
+    [metric("judgeP99"), "Judge p99 at 100 rps, two RPCs"],
     [metric("engineBranches"), "engine branches covered"],
   ];
   const cg = 0.2;
