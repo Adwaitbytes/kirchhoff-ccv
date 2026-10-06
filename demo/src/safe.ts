@@ -87,6 +87,8 @@ export async function ensureSafe(chain: Chain): Promise<{ address: Address; sent
     );
     const created = parseEventLogs({ abi: safeFactoryAbi, logs: sent.receipt.logs, eventName: "ProxyCreation" })[0];
     if (created === undefined || getAddress(created.args.proxy) !== address) throw new TxError("Safe proxy address differs from prediction");
+    // Load-balanced public RPCs can serve the next read from a node that has not seen the deployment block yet.
+    for (let i = 0; i < 30 && !(await hasCode(chain, address)); i++) await new Promise((r) => setTimeout(r, 2_000));
   }
   const onchainOwners = await read<readonly Address[]>(chain, { to: address, abi: safeAbi, functionName: "getOwners" });
   const threshold = await read<bigint>(chain, { to: address, abi: safeAbi, functionName: "getThreshold" });
