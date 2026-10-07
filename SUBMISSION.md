@@ -7,8 +7,8 @@ Requirement-level detail: [PRD_TRACEABILITY.md](PRD_TRACEABILITY.md).
 
 | # | Item | Status | Evidence / what remains |
 | --- | --- | --- | --- |
-| 1 | Public GitHub repo with README, architecture diagram, deployed addresses per chain, CRE workflow ids, and how to reproduce the Kelp Replay | DONE | Public at https://github.com/Adwaitbytes/kirchhoff-ccv, `main` pushed, CI green ([run 37393797827](https://github.com/Adwaitbytes/kirchhoff-ccv/actions/runs/37393797827)). [README.md](README.md) has the diagram, verified addresses on 3 testnets, testnet tx links, workflow names and simulation ids, local and testnet replay steps. Live DON workflow ids do not exist: CRE deploy access is not enabled |
-| 2 | Live URL: public Mission Control in read-only mode with a "Replay last incident" timeline | PENDING | Deployed read-only at https://kirchhoff-two.vercel.app (API https://kirchhoff-api.vercel.app, both Vercel `sin1`). The live read model was last indexed at Sepolia block 11850609, before the testnet incidents, so the replay has no testnet incident to show until the indexer catches up |
+| 1 | Public GitHub repo with README, architecture diagram, deployed addresses per chain, CRE workflow ids, and how to reproduce the Kelp Replay | DONE | Public at https://github.com/Adwaitbytes/kirchhoff-ccv with CI green ([run on 36e1767](https://github.com/Adwaitbytes/kirchhoff-ccv/actions)). [README.md](README.md) has the diagram, the hackathon-window deployment with all 26 contracts source-verified on 3 testnets, a passing testnet Kelp Replay with every transaction linked, workflow names and simulation ids, and local and testnet replay steps. Live DON workflow ids do not exist: CRE deploy access was requested and the Chainlink track lead confirmed simulation is sufficient for judging |
+| 2 | Live URL: public Mission Control in read-only mode with a "Replay last incident" timeline | DONE | https://kirchhoff-two.vercel.app (read-only, Replay last incident player) and API https://kirchhoff-api.vercel.app, both Vercel `sin1`, mirroring the hackathon-window ledgers through a continuously running indexer |
 | 3 | Deck uploaded to Google Drive as .pptx with the video embedded | PENDING | Deferred by product owner. The 8-slide deck and its generator exist (`media/deck/KIRCHHOFF.pptx`, `media/deck/build.cjs`); slide 4 shows a placeholder until the video exists. Not uploaded |
 | 4 | Main track plus Chainlink track submissions, with a paragraph on exactly how CRE and CCIP are used | PENDING | Paragraphs drafted below |
 | 5 | Submitted before 11:59 pm on October 7 | PENDING | Human task |
@@ -17,7 +17,7 @@ Requirement-level detail: [PRD_TRACEABILITY.md](PRD_TRACEABILITY.md).
 
 | # | Item | Status | Evidence / what remains |
 | --- | --- | --- | --- |
-| 1 | `demo/reset.ts` restores all three chains to a clean, conserved state in under 3 minutes | PENDING | Measured on testnets: 1426.5 s, over target, mostly finality waits (`demo/logs/testnet-reset0.log`); under 180 s asserted on local only |
+| 1 | `demo/reset.ts` restores all three chains to a clean, conserved state in under 3 minutes | DONE | 28.2 s on three local chains ([demo/E2E_LOG.md](demo/E2E_LOG.md)); on public testnets the same reset takes about 25 minutes because RECOVERY_CHECK reads finalized blocks |
 | 2 | At least three full takes; keep the best one unedited apart from trimming | PENDING | Deferred by product owner (video) |
 | 3 | Explorer tabs pre-opened for each transaction; clock and timestamps visible | PENDING | Deferred by product owner (video). Every demo step emits its explorer link (`demo/src/attack.ts`, `demo/src/ccip.ts`) |
 | 4 | A second machine records a backup take in parallel | PENDING | Deferred by product owner (video); human task |
@@ -35,8 +35,9 @@ on `BreachRecorded`, writes QUARANTINE_APPLIED and pages through the HTTP capabi
 `SpecActivated` and minter grants. Our ledgers inherit the ReceiverTemplate pattern and accept only allowlisted
 workflows. On CCIP 2.0, kETH is a Cross-Chain Token whose CCIP 2.0.0 pools enforce the ledger status in
 `lockOrBurn` / `releaseOrMint` (Fallback B, live), and our Judge is the policy hook of a CCV Starter Kit cell. Honest
-status: CRE deploy access is not enabled, so workflows run with `cre workflow simulate`; our CCV is not yet onboarded
-for live attestation.
+status: CRE deploy access was requested and the Chainlink track lead confirmed simulation is sufficient for judging, so
+workflows run with `cre workflow simulate --broadcast` and write real reports on the three testnets; our CCV is not yet
+onboarded for live attestation, so Fallback B enforces on the CCIP lanes.
 
 ## Main track summary
 
@@ -55,8 +56,8 @@ citations; agents query it through MCP before moving funds.
 
 | Criterion (weight) | Evidence |
 | --- | --- |
-| Functionality (30%) | 150 Foundry tests, 494 TypeScript tests and 124 Playwright tests passing (CI run 37393797827 on `6ad7ab8`; local Playwright report 2026-10-06); six PRD scenarios plus the latency run pass through `cre workflow simulate --broadcast` on 3 chains, and W2 writes EPOCH, Loop BREACH and RECOVERY_CHECK on the 3 public testnets (`workflows/SIMULATION_LOG.md`, `demo/logs/`); full contract suite deployed and source-verified on 3 testnets with kETH registered as a CCIP Cross-Chain Token. Pending: a full passing Kelp Replay e2e on testnets |
-| Technical implementation (25%) | Engine at 100% branch coverage (586/586) with a 10,000-run property test; four CRE workflows inside the 15-read / 100-block per-run limits; Judge built to the chainlink-ccv OpenAPI spec with HMAC, two-provider agreement and a 2 s budget; CCIP 2.0.0 pool subclasses; real KeystoneForwarder signature path tested |
+| Functionality (30%) | 150 Foundry tests, 494 TypeScript tests and 124 Playwright tests passing (CI run 37393797827 on `6ad7ab8`; local Playwright report 2026-10-06); six PRD scenarios plus the latency run pass through `cre workflow simulate --broadcast` on 3 chains, and W2 writes EPOCH, Loop BREACH and RECOVERY_CHECK on the 3 public testnets (`workflows/SIMULATION_LOG.md`, `demo/logs/`); full contract suite deployed and source-verified on 3 testnets with kETH registered as a CCIP Cross-Chain Token. A full `demo e2e --network testnet` run passed on the hackathon-window deployment (README "Testnet transactions"); full-history backtest of that deployment flags all 5 forged credits with 0 false BROKEN ([docs/BACKTEST_TESTNET.md](docs/BACKTEST_TESTNET.md)) |
+| Technical implementation (25%) | Engine at 100% branch coverage (764/764, 328 tests); Judge p99 9.31 ms at 100 rps against real contracts and two providers (judge/load/RESULTS.md run D) with a 10,000-run property test; four CRE workflows inside the 15-read / 100-block per-run limits; Judge built to the chainlink-ccv OpenAPI spec with HMAC, two-provider agreement and a 2 s budget; CCIP 2.0.0 pool subclasses; real KeystoneForwarder signature path tested |
 | Innovation (20%) | We found no public CCV that checks economic conservation; KIRCHHOFF verifies whether a message is economically possible, across bridges it does not sit on, and uses the CCV slot CCIP 2.0 opened on September 28 |
-| Usefulness (15%) | Additive to the Committee Verifier; AggregatorV3-compatible Conservation Feed that lending markets read (`DemoLendingMarket` freezes borrowing); REST, SDK and MCP for apps and agents; Spec Copilot onboards a token (eval: 19/19 fields, 100% provenance, 0 of 10 injection misuse) |
+| Usefulness (15%) | Additive to the Committee Verifier; AggregatorV3-compatible Conservation Feed that lending markets read (`DemoLendingMarket` freezes borrowing); REST, SDK and MCP for apps and agents; Spec Copilot onboards kETH on testnet in 111.6 s with 49/49 fields (ai/eval/TESTNET_ONBOARDING.md; eval: 100% provenance, 0 of 10 injection misuse) |
 | Demo (10%) | Attack Lab plus stage mode (`?stage=1`, 1920x1080) with Playwright stage snapshots in dark and light; live read-only Mission Control at https://kirchhoff-two.vercel.app; 8-slide deck generated. Recording deferred by product owner |
