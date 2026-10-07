@@ -4,6 +4,7 @@ import Ajv from "ajv";
 import { getAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import { parseArgs, reportMode } from "../src/cli.ts";
+import { rpcRotation, SIMULATE_ATTEMPTS } from "../src/cre.ts";
 import { parseDotEnv } from "../src/env.ts";
 import { toEngineDeployments, type DeploymentSet, type RawDeployment } from "../src/deployments.ts";
 import { network } from "../src/networks.ts";
@@ -90,5 +91,30 @@ describe("networks", () => {
     expect(n.chains.home.ccip?.onRamp).toBe("0x8dcf17f298c881A547D91ca4aA3C2AD7568C6777");
     expect(n.chains.base.ccip?.offRamp).toBe("0xa137536A3BFd81aD6f090981268b8C2818451d41");
     expect(network("local").chains.home.ccip).toBeNull();
+  });
+});
+
+describe("cre provider rotation", () => {
+  const repoEnv = {
+    RPC_ETH_SEPOLIA_1: "https://sepolia.gateway.tenderly.co",
+    RPC_ARB_SEPOLIA_1: "https://arbitrum-sepolia.gateway.tenderly.co",
+    RPC_BASE_SEPOLIA_1: "https://base-sepolia.gateway.tenderly.co",
+  };
+
+  it("never hands a retry a provider used in either of the two previous attempts", () => {
+    for (const urls of Object.values(rpcRotation(repoEnv))) {
+      expect(urls.length).toBeGreaterThanOrEqual(3);
+      for (let r = 2; r < SIMULATE_ATTEMPTS; r++) {
+        const window = [r - 2, r - 1, r].map((i) => urls[i % urls.length]);
+        expect(new Set(window).size).toBe(3);
+      }
+    }
+  });
+
+  it("puts a keyed Alchemy endpoint first and keeps the repo providers in the rotation", () => {
+    const rotation = rpcRotation({ ...repoEnv, ALCHEMY_API_KEY: "k" });
+    expect(rotation.RPC_ETH_SEPOLIA_1[0]).toBe("https://eth-sepolia.g.alchemy.com/v2/k");
+    expect(rotation.RPC_ARB_SEPOLIA_1).toContain(repoEnv.RPC_ARB_SEPOLIA_1);
+    expect(rotation.RPC_BASE_SEPOLIA_1).toContain(repoEnv.RPC_BASE_SEPOLIA_1);
   });
 });

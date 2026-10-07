@@ -77,19 +77,37 @@ export async function prebuildWasm(net: NetworkName): Promise<void> {
  * Archive-capable providers per CRE chain, in rotation order (probed 2026-10-05 with eth_call at the `finalized`
  * block: publicnode serves it on Sepolia and Base but not on Arbitrum, where finalized is ~4,000 blocks deep).
  * Burst-tolerant endpoints come first: the Tenderly public gateway (the repo's provider 1) rejects most of a burst
- * of parallel reads (measured 2026-10-06: 1 of 20), which is exactly how a CRE simulation reads. An optional
+ * of parallel reads (measured 2026-10-06: 1 of 20), which is exactly how a CRE simulation reads. thirdweb and 1rpc
+ * served 20 and 16 of 20 parallel `finalized` reads on 2026-10-07 while publicnode was rate limiting this machine
+ * (the indexer polls it too), so a rotation never returns to the same provider within a few attempts. An optional
  * ALCHEMY_API_KEY puts a keyed provider in front of all of them.
  */
-function rpcRotation(): Record<"RPC_ETH_SEPOLIA_1" | "RPC_ARB_SEPOLIA_1" | "RPC_BASE_SEPOLIA_1", string[]> {
-  const e = env();
+export function rpcRotation(e: Record<string, string> = env()): Record<"RPC_ETH_SEPOLIA_1" | "RPC_ARB_SEPOLIA_1" | "RPC_BASE_SEPOLIA_1", string[]> {
   const alchemy = (net: string): string | undefined => (e.ALCHEMY_API_KEY ? `https://${net}.g.alchemy.com/v2/${e.ALCHEMY_API_KEY}` : undefined);
   const list = (...urls: (string | undefined)[]): string[] => [...new Set(urls.filter((u): u is string => u !== undefined && u !== ""))];
   return {
-    RPC_ETH_SEPOLIA_1: list(alchemy("eth-sepolia"), "https://ethereum-sepolia-rpc.publicnode.com", e.RPC_ETH_SEPOLIA_1, "https://gateway.tenderly.co/public/sepolia"),
-    RPC_ARB_SEPOLIA_1: list(alchemy("arb-sepolia"), "https://sepolia-rollup.arbitrum.io/rpc", "https://arbitrum-sepolia.drpc.org", e.RPC_ARB_SEPOLIA_1),
-    RPC_BASE_SEPOLIA_1: list(alchemy("base-sepolia"), "https://base-sepolia-rpc.publicnode.com", "https://sepolia.base.org", "https://base-sepolia.drpc.org", e.RPC_BASE_SEPOLIA_1),
+    RPC_ETH_SEPOLIA_1: list(
+      alchemy("eth-sepolia"),
+      "https://ethereum-sepolia-rpc.publicnode.com",
+      "https://sepolia.rpc.thirdweb.com",
+      e.RPC_ETH_SEPOLIA_1,
+      "https://1rpc.io/sepolia",
+      "https://gateway.tenderly.co/public/sepolia",
+    ),
+    RPC_ARB_SEPOLIA_1: list(alchemy("arb-sepolia"), "https://sepolia-rollup.arbitrum.io/rpc", "https://421614.rpc.thirdweb.com", "https://arbitrum-sepolia.drpc.org", e.RPC_ARB_SEPOLIA_1),
+    RPC_BASE_SEPOLIA_1: list(
+      alchemy("base-sepolia"),
+      "https://base-sepolia-rpc.publicnode.com",
+      "https://84532.rpc.thirdweb.com",
+      "https://sepolia.base.org",
+      "https://base-sepolia.drpc.org",
+      e.RPC_BASE_SEPOLIA_1,
+    ),
   };
 }
+
+/** Simulation attempts before a rate-limited or stalled run fails; the backoff between them grows to 60 s. */
+export const SIMULATE_ATTEMPTS = 10;
 
 /**
  * Runs `cre` with the environment passed in memory instead of `-e ../.env` (a `-e` file overrides the process env,
@@ -111,6 +129,8 @@ async function simulateOnce(args: SimulateArgs, rotation = 0): Promise<SimulateR
     return { command, exitCode: typeof failed.code === "number" ? failed.code : 1, output, ...parseSimulateOutput(output) };
   }
 }
+
+const backoffSeconds = (attempt: number): number => Math.min(10 * attempt, 60);
 
 export class SimulationError extends Error {
   override readonly name = "SimulationError";
@@ -146,15 +166,15 @@ export async function simulate(
   // A rate limit rotates every chain to its next archive-capable provider (CRE pins `finalized`, ~17 min deep on
   // these testnets, so non-archive endpoints cannot serve it); a login transient retries as is.
   let rotation = 0;
-  for (let attempt = 1; attempt < 7 && result.error !== null; attempt++) {
+  for (let attempt = 1; attempt < SIMULATE_ATTEMPTS && result.error !== null; attempt++) {
     // No result at all means the run stalled (e.g. a provider that never answers the connectivity check): rotate too.
     const limited = RATE_LIMITED.test(result.output) || result.result === null;
     if (!limited && !TRANSIENT.test(result.output)) break;
     if (limited) rotation++;
     // An expired CRE session fails every retry the same way; `cre whoami` exchanges the refresh token first.
     if (result.output.includes("Credential validation failed")) await refreshCreSession();
-    log(`  [${workflow}] ${limited ? `provider rate limited or missing state, rotating providers (set ${rotation})` : "CRE login transient"}; retry ${attempt + 1}/7 in ${10 * attempt}s`);
-    await new Promise((r) => setTimeout(r, 10_000 * attempt));
+    log(`  [${workflow}] ${limited ? `provider rate limited or missing state, rotating providers (set ${rotation})` : "CRE login transient"}; retry ${attempt + 1}/${SIMULATE_ATTEMPTS} in ${backoffSeconds(attempt)}s`);
+    await new Promise((r) => setTimeout(r, backoffSeconds(attempt) * 1000));
     result = await simulateOnce({ ...args, wasm: await wasmFor(workflow, target) }, rotation);
   }
   for (const line of result.userLogs) log(`  [${workflow}] ${line}`);
