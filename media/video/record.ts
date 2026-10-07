@@ -615,7 +615,8 @@ async function recordTake(o: Options): Promise<Manifest> {
     await forged.waitFor({ timeout: Math.max(1000, d.remaining() - 16_000) }).catch(() => undefined);
     if (!(await forged.isVisible())) {
       await d.cut();
-      await forged.waitFor({ timeout: 300_000 });
+      // The forge waits for the baseline W2 epoch, whose CRE retries on rate-limited public RPCs can take 10+ minutes.
+      await forged.waitFor({ timeout: 20 * 60_000 });
       d.roll("forged release confirmed", 2500);
     }
     const lab = await http<{ run: { id: string } | null }>(`${o.api}/v1/lab/status`);
