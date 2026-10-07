@@ -8,12 +8,14 @@
 import { main, parseArgs } from "./src/cli.ts";
 import { loadContext } from "./src/context.ts";
 import { stepEmitter } from "./src/events.ts";
-import { activateSpec } from "./src/spec.ts";
+import { activateSpec, applySpecParameters } from "./src/spec.ts";
 
 async function run(): Promise<void> {
   const args = parseArgs(process.argv.slice(2), { options: [], flags: [] });
   const ctx = await loadContext(args.network);
-  await activateSpec(ctx, stepEmitter(ctx.net.name));
+  const emit = stepEmitter(ctx.net.name);
+  await activateSpec(ctx, emit);
+  await applySpecParameters(ctx, emit);
 }
 
 main(run);

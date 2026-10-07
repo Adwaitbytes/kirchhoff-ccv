@@ -9,6 +9,8 @@ import type { Context } from "./context.ts";
 import { mergedPath, readState } from "./deployments.ts";
 import { REPO_ROOT } from "./env.ts";
 import { log, type stepEmitter } from "./events.ts";
+import { ledgerAbi, quarantineAbi } from "./abi.ts";
+import { ROLES } from "./networks.ts";
 import { execSafe } from "./safe.ts";
 
 type Emit = ReturnType<typeof stepEmitter>;
@@ -114,4 +116,34 @@ export async function activateSpec(ctx: Context, emit: Emit): Promise<SpecLifecy
   if (after.toLowerCase() !== hash.toLowerCase()) throw new Error(`activateSpec left active hash ${after}, expected ${hash}`);
   emit({ step: "spec-activate", status: "ok", chain: "home", title: `spec ${hash} active`, txHash: activate.hash, explorerUrl: activate.url });
   return { specHash: hash, specURI: uri, propose, activate, skipped: false };
+}
+
+/**
+ * The spec owns the contract parameters (PRD 6.K4). After activation the issuer Safe brings every chain's
+ * QuarantineController recovery timelock and ConservationLedger staleness window in line with it. Idempotent.
+ */
+export async function applySpecParameters(ctx: Context, emit: Emit): Promise<Sent[]> {
+  const safe = readState(ctx.net.name).safe?.address;
+  if (safe === undefined) throw new Error("no issuer Safe recorded; run deploy-all first");
+  const want = specParameters();
+  const sent: Sent[] = [];
+  for (const role of ROLES) {
+    const chain = ctx.chains[role];
+    const quarantine = ctx.at(role, "quarantineController");
+    const ledger = ctx.at(role, "conservationLedger");
+    const timelock = await read<bigint>(chain, { to: quarantine, abi: quarantineAbi, functionName: "recoveryTimelockOf", args: [ctx.tokenId] });
+    if (timelock !== want.recoveryTimelockSeconds) {
+      const s = await execSafe(chain, safe, { to: quarantine, abi: quarantineAbi, functionName: "setRecoveryTimelock", args: [ctx.tokenId, want.recoveryTimelockSeconds] }, `set recovery timelock ${want.recoveryTimelockSeconds}s on ${role}`);
+      emit({ step: "spec-params", status: "ok", chain: role, title: `recovery timelock ${timelock}s to ${want.recoveryTimelockSeconds}s`, txHash: s.hash, explorerUrl: s.url });
+      sent.push(s);
+    }
+    const staleness = await read<bigint>(chain, { to: ledger, abi: ledgerAbi, functionName: "stalenessSeconds", args: [ctx.tokenId] });
+    if (staleness !== want.stalenessSeconds) {
+      const s = await execSafe(chain, safe, { to: ledger, abi: ledgerAbi, functionName: "setStalenessSeconds", args: [ctx.tokenId, want.stalenessSeconds] }, `set staleness ${want.stalenessSeconds}s on ${role}`);
+      emit({ step: "spec-params", status: "ok", chain: role, title: `staleness ${staleness}s to ${want.stalenessSeconds}s`, txHash: s.hash, explorerUrl: s.url });
+      sent.push(s);
+    }
+  }
+  if (sent.length === 0) emit({ step: "spec-params", status: "skipped", title: "contract parameters already match the spec" });
+  return sent;
 }
