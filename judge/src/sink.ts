@@ -5,6 +5,7 @@
  * oldest report when the API is down; one batch (<= 100) is in flight at a time.
  */
 import type { Counter, Gauge } from "prom-client";
+import { evmAddress } from "@kirchhoff/engine";
 import type { Logger } from "./log.ts";
 
 export type VerdictReport = {
@@ -153,7 +154,11 @@ export class VerdictSink {
 const BYTES32 = /^0x[0-9a-fA-F]{64}$/;
 const EVM_PADDED = /^0x(?:0{24})?[0-9a-fA-F]{40}$/;
 const CELL_ID = /^[A-Za-z0-9._-]{1,64}$/;
-const HEX_ADDRESS = /^0x[0-9a-fA-F]{0,128}$/;
+
+function feeTokenAddress(raw: string): { feeToken?: string } {
+  const address = raw === "0x" ? null : evmAddress(raw);
+  return address === null ? {} : { feeToken: address };
+}
 const UINT = /^[0-9]{1,78}$/;
 
 export type SinkInput = {
@@ -214,7 +219,8 @@ export function toReport(input: SinkInput, specSelectors: ReadonlySet<string>): 
     sourceBlock: r.source_block_number,
     finality: { mode: m.finality.mode, blockDepth: m.finality.block_depth, safe: m.finality.safe },
     ...(r.source_block_timestamp === undefined ? {} : { sourceBlockTimestamp: r.source_block_timestamp }),
-    ...(r.fee_token === undefined || !HEX_ADDRESS.test(r.fee_token) ? {} : { feeToken: r.fee_token.toLowerCase() }),
+    // The hook carries fee_token 32-byte left-padded; the read model stores the 20-byte address.
+    ...(r.fee_token === undefined ? {} : feeTokenAddress(r.fee_token)),
     ...(r.fee_token_amount === undefined || !UINT.test(r.fee_token_amount) ? {} : { feeTokenAmount: r.fee_token_amount }),
   };
 }

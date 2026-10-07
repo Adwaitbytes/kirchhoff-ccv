@@ -94,7 +94,8 @@ describe("toReport", () => {
     expect(r).toMatchObject({
       sourceBlock: 1837421,
       sourceBlockTimestamp: "2026-10-04T12:34:56Z",
-      feeToken: `0x${"0".repeat(64)}`,
+      // The hook pads fee_token to 32 bytes; the report carries the 20-byte address the read model stores.
+      feeToken: `0x${"0".repeat(40)}`,
       feeTokenAmount: "1000000000000000",
       finality: { mode: "finalized", blockDepth: 0, safe: false },
     });
