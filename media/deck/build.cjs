@@ -46,8 +46,8 @@ const METRICS = {
   loopBreachToBroken: { value: "2 to 4 s", source: "workflows/SIMULATION_LOG.md scenario 7 (after the breach block reaches confidence)" },
   copilotOnboardTime: { value: "112 s", source: "ai/eval/TESTNET_ONBOARDING.md (live testnet run, 49 of 49 fields)" },
   falseBrokenBacktest: { value: PENDING, source: "PRD_TRACEABILITY.md 'Pending measurement' 2.M3" },
-  testnetKelpReplay: { value: PENDING, source: "PRD_TRACEABILITY.md 'Pending work' item 3" },
-  resetWallTime: { value: PENDING, source: "PRD_TRACEABILITY.md 'Pending measurement' 15.REC1" },
+  testnetKelpReplay: { value: "Passed", source: "demo/logs/testnet-e2e-1.log (e2e PASSED; attack to containment 1266.7 s across 3 Sepolia chains)" },
+  resetWallTime: { value: "about 25 min", source: "demo/logs testnet resets 1465 to 1599 s, bound by Sepolia finality plus the 120 s recovery timelock" },
 };
 
 // Team names are not recorded anywhere in the repo. Fill these in; the slide shows them once set.
