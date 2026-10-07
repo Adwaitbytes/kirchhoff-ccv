@@ -169,6 +169,7 @@ async function run(): Promise<void> {
   lap("refusalsAndDeficitSeconds");
 
   const payload = hookPayload(ctx, release, await refusalBlock(ctx, refusals.ccipPool ?? refusals.ccip));
+  process.stdout.write(`${JSON.stringify({ label: "Testnet simulation", step: "hook-payload", payload })}\n`);
   emit({ step: "judge-replay-payload", status: "ok", title: "policy-hook payload produced", detail: { messageId: String(payload.message_id) } });
 
   // Reset.
