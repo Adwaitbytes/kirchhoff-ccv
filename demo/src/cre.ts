@@ -147,7 +147,8 @@ export async function simulate(
   // these testnets, so non-archive endpoints cannot serve it); a login transient retries as is.
   let rotation = 0;
   for (let attempt = 1; attempt < 7 && result.error !== null; attempt++) {
-    const limited = RATE_LIMITED.test(result.output);
+    // No result at all means the run stalled (e.g. a provider that never answers the connectivity check): rotate too.
+    const limited = RATE_LIMITED.test(result.output) || result.result === null;
     if (!limited && !TRANSIENT.test(result.output)) break;
     if (limited) rotation++;
     // An expired CRE session fails every retry the same way; `cre whoami` exchanges the refresh token first.
