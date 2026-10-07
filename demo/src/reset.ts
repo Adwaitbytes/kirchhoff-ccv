@@ -188,8 +188,20 @@ export async function resetAll(ctx: Context, emit: Emit, mode: ReportMode): Prom
     // Every chain's resolve and the home rebalance must be final before W2 (it reads ledgers and balances at the
     // finalized pin). Anvil: also mine past W2's 2 x 100-block windows.
     await settle(ctx, ROLES, 300);
-    const w2 = await runWorkflow(ctx, "w2-loop", 0);
+    let w2 = await runWorkflow(ctx, "w2-loop", 0);
     emitWrites(emit, "recovery-check", w2);
+    // W2 picks RECOVERY_CHECK per chain from the ledger status at its pinned block; a chain whose resolve landed after
+    // that pin still reads QUARANTINED there, so it gets a plain (ignored) epoch. The DON's next cron fixes that;
+    // re-run W2 the same way while any chain is still RECOVERING.
+    for (let round = 1; round <= 5; round++) {
+      const still: ChainRole[] = [];
+      for (const role of ROLES) if ((await ledgerStatus(ctx, role)).status === Status.RECOVERING) still.push(role);
+      if (still.length === 0) break;
+      log(`  ${still.join(", ")} still RECOVERING after W2; next W2 round in 60s (${round}/5)`);
+      await new Promise((r) => setTimeout(r, 60_000));
+      w2 = await runWorkflow(ctx, "w2-loop", 0);
+      emitWrites(emit, "recovery-check", w2);
+    }
     emit({ step: "recovery-check", status: "ok", title: `W2 RECOVERY_CHECK via CRE on ${recovering.join(", ")}`, detail: { result: w2.result.result } });
   } else {
     for (const role of recovering) {
