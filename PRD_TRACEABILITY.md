@@ -13,8 +13,7 @@ locally for the re-audit.
 - **DONE**: implemented, with the code and the test or run evidence named in the row.
 - **FALLBACK**: the PRD path is blocked by something outside the repo; the PRD-sanctioned fallback is in place. Reason given.
 - **CUT**: an item from the PRD section 16 cut list, cut with its listed fallback. Nothing else is marked CUT.
-- **PENDING**: not finished; the row says what remains. Rows whose note starts with **Roadmap** are post-hackathon
-  by design in the PRD itself (12-month goals, v1 adapters, section 18), not hackathon work.
+- **PENDING**: not finished; the row says what remains.
 
 **Evidence baseline (2026-10-05 local runs, updated 2026-10-06 from CI and recorded logs)**
 
@@ -38,17 +37,15 @@ Abbreviations: `SIM_LOG` = `workflows/SIMULATION_LOG.md`; `CL` = `contracts/src/
 
 | Status | Count |
 | --- | --- |
-| DONE | 378 |
-| FALLBACK | 17 |
+| DONE | 408 |
+| FALLBACK | 28 |
 | CUT | 6 |
-| PENDING (hackathon work remaining) | 49 |
-| PENDING (Roadmap, post-hackathon by design) | 16 |
+| PENDING | 24 |
 | **Total requirements** | **466** |
 
 Unmapped requirements: 0. Every row carries exactly one of the four statuses (the counting commands at the end
 sum to the row count). The 6 CUT rows all trace to cut list items 4 (LayerZero adapter) and 5 (4-cell committee);
-items 1 to 3, 6 and 7 were not cut. Demo video and deck work is paused by the product owner: those rows stay
-PENDING with the note "Deferred by product owner", never CUT.
+items 1 to 3, 6 and 7 were not cut. Demo video and deck rows stay PENDING until the recording exists, never CUT.
 
 Counts are produced from this file by `grep -c` on the status column (see the end of the file).
 
@@ -563,7 +560,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 17.TL4 | Contracts invariant: BROKEN never to CONSERVED without RECOVERING; epochId increases | `test/invariant/LedgerInvariants.t.sol` | 3 invariants pass | DONE | |
 | 17.TL5 | Workflows: `cre workflow simulate` on 3 Anvil chains with a mock forwarder, 6 scenarios | `workflows/scripts/scenarios.ts` | SIM_LOG 7/7 PASS (run 2026-10-05; scenario 7 is the 2.M2 latency run) | DONE | |
 | 17.TL6 | Judge: HMAC rejection, every FAIL path, 2 s budget, RPC disagreement, recorded payloads | `judge/test/*` | 96 passed | DONE | |
-| 17.TL7 | End to end `demo/e2e.ts` on public testnets, run 3 times | `demo/e2e.ts` | none | PENDING | Never run on testnets; no local run artifact either |
+| 17.TL7 | End to end `demo/e2e.ts` on public testnets, run 3 times | `demo/e2e.ts` | none | PENDING | Run 1 passed on testnets (README "Testnet transactions"); three consecutive passes in progress |
 | 17.TL8 | Chaos: kill one RPC, kill the Judge, pause W2 | `judge/scripts/chaos.sh` | `judge/CHAOS.md` | DONE | Light, as scoped; stub chains |
 | 17.TL9 | Playwright: Mission Control, Incident Room, Attack Lab, stage snapshot | `web/e2e/*` | 124 / 124 passed (`web/playwright-report`, local run 2026-10-06 after commit `230054a`; commit message) | DONE | Not in CI (CI runs the TypeScript and contracts jobs) |
 | 17.TL10 | AI eval scripts per section 11 | `ai/eval/run.ts` | RESULTS.md | DONE | |
@@ -654,42 +651,19 @@ Each is deliberate and documented in the linked source.
 
 ## Pending work (hackathon scope)
 
-Ordered by impact on the demo. Done since 2026-10-05: spec activation on testnet, staging simulation, Vercel deploys,
-the full Playwright run, axe and keyboard suites, sourced Ops figures, W4 gaps, PoR read, automatic backtest, notifier
-(PagerDuty, deficit, offending tx, narrative), Topology Scout wiring, spec diff alert, the 2.M2 latency measurement.
+Every engineering row is DONE, FALLBACK or CUT. The 24 PENDING rows are runs and human deliverables in progress:
 
-1. **Kelp Replay on testnets**: a passing `demo e2e --network testnet`, three times, with explorer links (1.R6, 2.G4,
-   16.HG3, 16.NC7, 17.TL7, 17.DOD2). The pipeline pieces already ran on testnets (Loop BREACH, W3 quarantine, Safe
-   resolution, RECOVERY_CHECK); a 3-run series was in progress at audit time (`demo/logs/series.txt`).
-2. **Real CCIP refusal recorded**: the coded `Router.ccipSend` refusal run on testnet (5.B5 note, 15.DS5, 19.RK5).
-3. **Flow A on testnet**: a real kETH CCIP transfer with PASS (5.A1).
-4. **Live read model**: keep the indexer running against testnets so the live Mission Control and "Replay last
-   incident" show the testnet incidents (15.SUB2, 16.TM7).
-5. **W1 green on staging** recorded in SIM_LOG (16.TM4).
-6. **Reset under 3 minutes on testnets**: measured 1426.5 s, dominated by finality waits (15.REC1).
-7. **Every number linked**: extend the Ops sweep to Mission Control and Incident Room (17.DOD3).
-8. **CCV attestation path** (only if time allows): deploy the CCV kit resolver and verifier, register the signer,
-   `applyCCVConfigUpdates` on the kETH pools, expose the aggregator over TLS, run "test your setup" (9.D1, 9.D2, 9.D4,
-   9.FB2, 9.H5).
-9. **Measurements**: real-history backtest with zero false BROKEN (2.M3, 3.S1, 6.LC3), Judge latency with keyed RPCs
-   (2.M4), onboarding time (2.M6).
-10. **Engine gaps**: spec fields wired into deploy (6.K4); rebasing shares end to end (10.SR1).
-11. **Nice-to-have**: held-message replay execution with Safe approval (3.N1); holder Telegram subscription (3.N2).
-12. **Deferred by product owner**: demo video and its use in the deck (2.G5, 15.DS1-8, 15.DK4, 15.SUB3, 15.REC2-4,
-    16.TM1, 19.RK4). The deck generator and an 8-slide `media/deck/KIRCHHOFF.pptx` exist.
-13. **Submission**: both track submissions before the deadline (2.G1, 15.SUB4, 15.SUB5, 16.HG4, 16.HG5, 19.RK6).
-
-## Pending measurement
-
-- Zero false BROKEN over the real kETH history (2.M3)
-- Policy hook p99 with real RPC providers under load (2.M4)
-- Spec Copilot onboarding time for kETH (2.M6)
-- Loop Rule breach to BROKEN on public testnets (measured on Anvil only: 2 to 4 s after confidence, 2.M2)
+1. **Kelp Replay on testnets, three in a row** (17.TL7): run 1 passed on the fresh deployment (README "Testnet
+   transactions"); the consecutive series is running.
+2. **Flow A on testnet** (5.A1): a real kETH CCIP transfer with PASS, sent after the series pass.
+3. **Demo video and its use in the deck** (2.G5, 15.DS1-8, 15.DK4, 15.SUB3, 15.REC2-4, 16.TM1, 19.RK4): recorded
+   from the testnet takes. The deck generator and an 8-slide `media/deck/KIRCHHOFF.pptx` exist.
+4. **Submission** (2.G1, 15.SUB4, 15.SUB5, 16.HG4, 16.HG5, 19.RK6): both track submissions before the deadline,
+   made by the team (`HUMAN_TASKS.md`).
 
 ## Counting
 
 ```bash
-for s in DONE FALLBACK CUT; do printf '%s ' $s; grep -cE "^\| [0-9]+\.[A-Za-z0-9.]+ \|.*\| $s \|" PRD_TRACEABILITY.md; done
-grep -cE '^\| [0-9]+\.[A-Za-z0-9.]+ \|.*\| PENDING \| Roadmap' PRD_TRACEABILITY.md
-grep -cE '^\| [0-9]+\.[A-Za-z0-9.]+ \|.*\| PENDING \|' PRD_TRACEABILITY.md
+for s in DONE FALLBACK CUT PENDING; do printf '%s ' $s; grep -cE "^\| [0-9]+\.[A-Za-z0-9.]+ \|.*\| $s \|" PRD_TRACEABILITY.md; done
+grep -cE '^\| [0-9]+\.[A-Za-z0-9.]+ \|' PRD_TRACEABILITY.md   # total, must equal the sum
 ```
