@@ -63,7 +63,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 1.R3 | Quarantine: excess frozen on the infected chain; clean chains keep working | `contracts/src/QuarantineController.sol`, `workflows/src/w3.ts` | CLt `test_breach_fromConservedSetsBrokenAndContains`, `test_quarantine_fromBroken`; SIM_LOG scenario 3 | DONE | Lanes for the token freeze and the recipient is tainted; untainted holders keep transferring (Guard blocks only tainted senders) |
 | 1.R4 | Mission Control: live ledger UI of every chain, the invariant and every verdict | `web/components/mission/*` | MCs (10 tests) | DONE | Public deployment tracked in 15.SUB2 |
 | 1.R5 | Spec Copilot turns plain English into a machine-checked spec; AI never in the veto path | `ai/src/copilot/*`, `scripts/no-ai-in-veto-path.sh` | `ai/test/copilot.int.test.ts`; `ai/eval/RESULTS.md` sections 1-2 | DONE | |
-| 1.R6 | Kelp Replay: scripted forged-message attack that fails | `demo/attack-kelp-replay.ts`, `demo/src/attack.ts`, `demo/e2e.ts` | SIM_LOG scenario 3 (local, 7 kETH); `demo/logs/testnet-run1*.log` | PENDING | Testnet simulation: the Loop Rule BREACH (Δ -116,500 kETH), W3 quarantine and Safe resolution are onchain on all 3 testnets (README "Testnet transactions"), but no `demo e2e --network testnet` has passed: runs 1 and 1b died on RPC 429s, run 1c stopped at the baseline assert because the ledgers were still BROKEN from an earlier attack. A 3-run series was running at audit time (`demo/logs/series.txt`) |
+| 1.R6 | Kelp Replay: scripted forged-message attack that fails | `demo/attack-kelp-replay.ts`, `demo/src/attack.ts`, `demo/e2e.ts` | README "Testnet transactions" (passing `demo e2e --network testnet` run, 2026-10-07 05:32 to 07:03 UTC) | DONE | Testnet simulation: forged WeakBridge credit with no burn, BREACH on 3 ledgers in one W1 run, W3 quarantine, CCIP/Guard/borrow refusals mined and reverted, Loop deficit asserted at -116,500 kETH, reset to CONSERVED |
 | 1.R7 | Tagline "Every bridge checks who signed. KIRCHHOFF checks if the money adds up." | `web/components/landing/landing.tsx:83`, `README.md` | n/a | DONE | |
 
 ## 2. Goals, non-goals, success metrics
@@ -73,7 +73,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 2.G1 | Win the Chainlink track and place main-track Top 5 | `SUBMISSION.md` | n/a | PENDING | Submission not made |
 | 2.G2 | A working CRE workflow is the core of the product | `workflows/` | SIM_LOG 7/7 local; staging section | DONE | |
 | 2.G3 | Real CCV policy hook in a CCV Starter Kit cell, with a working fallback | `ccv/`, `judge/`, Fallback B pools | `ccv/STATUS.md`; `KirchhoffTokenPool.t.sol` | FALLBACK | Cell runs with the Judge wired; live attestation blocked (see 9.D2); Fallback B deployed |
-| 2.G4 | Kelp Replay end to end on public testnets, real txs and explorer links | `demo/e2e.ts` | `demo/logs/testnet-run1c.log`, `demo/logs/testnet-reset0.log` | PENDING | kETH spec active on testnet and the first EPOCH written (SIM_LOG staging); no passing testnet e2e yet (1.R6) |
+| 2.G4 | Kelp Replay end to end on public testnets, real txs and explorer links | `demo/e2e.ts` | README "Testnet transactions" (passing `demo e2e --network testnet` run, 2026-10-07 05:32 to 07:03 UTC) | DONE | Real transactions with explorer links for every step on Ethereum, Arbitrum and Base Sepolia |
 | 2.G5 | UI good enough to screen-record without edits | `web/`, stage mode | `web/e2e/*` (124 / 124 passed) | PENDING | UI built; recording deferred by product owner (demo video work paused until the owner asks) |
 | 2.P1 | Default economic CCV in the CCV marketplace | `README.md` "Roadmap and business" | n/a | FALLBACK | PRD 2 product goal (12 months), not hackathon scope; the enforcing core ships now and the path to marketplace listing is in the roadmap |
 | 2.P2 | Cover tokens on several bridges at once | `README.md` "Roadmap and business" | n/a | FALLBACK | PRD 2 product goal (12 months), not hackathon scope; the enforcing core ships now and the path to LayerZero, Wormhole and native bridge adapters is in the roadmap |
@@ -527,7 +527,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 16.TM1 | Lead: mentor answers, cut decisions, video, deck | `HUMAN_TASKS.md` | n/a | PENDING | Deferred by product owner (demo video work paused until the owner asks); deck generator at `media/deck` |
 | 16.TM2 | Contracts lead: deployed and verified on 3 testnets | `deployments/testnet*.json` | Etherscan V2 | DONE | |
 | 16.TM3 | Contracts 2: demo contracts, Guard, TokenPool, deploy and reset scripts | `contracts/src/demo`, `demo/` | `forge test`, `demo` tests | DONE | |
-| 16.TM4 | CRE lead: W1 and W2 simulating green against testnets | `workflows/` | SIM_LOG staging section (W2 `--broadcast`, W4); `workflows/runner.log.jsonl` | PENDING | W2 green on all 3 testnets (first EPOCH, Loop BREACH, RECOVERY_CHECK); W1 has no recorded green staging run yet (the runner hit RPC 429s) |
+| 16.TM4 | CRE lead: W1 and W2 simulating green against testnets | `workflows/w1-junction`, `workflows/w2-loop` | README "Testnet transactions" (passing `demo e2e --network testnet` run, 2026-10-07 05:32 to 07:03 UTC); `workflows/SIMULATION_LOG.md` | DONE | W1 (BREACH on 3 chains) and W2 (baseline, Loop deficit, RECOVERY_CHECK) green against the testnets through cre workflow simulate --broadcast |
 | 16.TM5 | Engine at 100% branch coverage | `engine/` | coverage run | DONE | |
 | 16.TM6 | CCV/infra: Judge live in a cell, or Fallback B | `ccv/`, `judge/` | STATUS.md | FALLBACK | Fallback B primary |
 | 16.TM7 | Frontend lead: hero screen on live data | `web/` | https://kirchhoff-two.vercel.app serving the new deployment | DONE | Hero screen on live testnet data |
@@ -535,7 +535,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 16.TM9 | AI + API: indexer, Copilot, Narrator | `indexer/`, `ai/`, `api/` | package tests | DONE | |
 | 16.HG1 | Hour 4: ABI freeze | `docs/INTERFACES.md`, `contracts/src/interfaces/` | commit `d8aebf6` | DONE | |
 | 16.HG2 | Hour 10: CCV path decision | `HUMAN_TASKS.md`, `ccv/STATUS.md` | n/a | DONE | Fallback B is primary |
-| 16.HG3 | Hour 22: first full Kelp Replay on testnets | `demo/e2e.ts` | none | PENDING | 2.G4 |
+| 16.HG3 | Hour 22: first full Kelp Replay on testnets | `demo/e2e.ts` | README "Testnet transactions" (passing `demo e2e --network testnet` run, 2026-10-07 05:32 to 07:03 UTC) | DONE | First full Kelp Replay on testnets passed (later than hour 22 of the plan) |
 | 16.HG4 | Hour 28: code freeze | n/a | n/a | PENDING | |
 | 16.HG5 | Hour 35: submitted | n/a | n/a | PENDING | |
 | 16.CL1 | Cut list 1: Topology Scout | `ai/src/scout.ts` | `scout.test.ts`; APIt scout tests; `onboard.spec.ts` | DONE | Not cut: built and wired (11.TS) |
@@ -551,7 +551,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 16.NC4 | Never cut: Judge or Fallback B | `judge/`, pools | tests | DONE | |
 | 16.NC5 | Never cut: Circuit Map | `circuit-map.tsx` | MCs | DONE | |
 | 16.NC6 | Never cut: Verdict Stream | `verdict-stream.tsx` | MCs | DONE | |
-| 16.NC7 | Never cut: Kelp Replay | `demo/attack-kelp-replay.ts` | SIM_LOG scenario 3 | PENDING | Testnet run (2.G4) |
+| 16.NC7 | Never cut: Kelp Replay | `demo/`, `workflows/`, `contracts/` | README "Testnet transactions" (passing `demo e2e --network testnet` run, 2026-10-07 05:32 to 07:03 UTC) | DONE | Kelp Replay works end to end on the hackathon-window deployment |
 
 ## 17. Testing and QA
 
@@ -575,7 +575,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 17.SC5 | Direct mint: BROKEN `LOOP_DEFICIT` | same | scenario 5 PASS | DONE | |
 | 17.SC6 | Donation: Δ rises, CONSERVED, UI shows surplus | same; `conservation-meter.tsx` | scenario 6 PASS | DONE | |
 | 17.DOD1 | Tests written and green | all packages | baseline table above | DONE | |
-| 17.DOD2 | Works on the 3 public testnets, not just Anvil | `deployments/testnet.json` | Ledgers written by CRE simulation on all 3 testnets (README "Testnet transactions") | PENDING | EPOCH, Loop BREACH, W3 quarantine, Safe resolution and RECOVERY_CHECK ran on testnets; a passing full e2e is pending (1.R6) |
+| 17.DOD2 | Works on the 3 public testnets, not just Anvil | all packages | README "Testnet transactions" (passing `demo e2e --network testnet` run, 2026-10-07 05:32 to 07:03 UTC); live read model at https://kirchhoff-two.vercel.app | DONE | The never-cut path runs on the 3 public testnets, not just Anvil |
 | 17.DOD3 | Every number links to an explorer tx or onchain read | `web/components/kh/links.tsx`, `web/lib/explorer.ts` | `web/e2e/number-links.spec.ts` (Playwright 129/129); `web/e2e/ops-links.spec.ts` | DONE | Every figure on every screen links to its explorer transaction, onchain read or metrics source, asserted by a Playwright sweep |
 | 17.DOD4 | Loading, empty, stale, error, breach states | 12.ST1-5 | MCs | DONE | |
 | 17.DOD5 | No em dashes in user-facing copy | `web/` | `grep -rn` for U+2014 in `web/app web/components web/lib`: 0 | DONE | |
@@ -603,7 +603,7 @@ Counts are produced from this file by `grep -c` on the status column (see the en
 | 19.RK2 | CRE live deploy not granted: simulate, labeled honestly | README, SIM_LOG | n/a | DONE | |
 | 19.RK3 | False DRIFT or BROKEN from in-flight: matching, scenario 2 | `matchAll` | scenario 2 PASS | DONE | |
 | 19.RK4 | Testnet congestion: reset script, three takes, backup recorder | `demo/reset.ts` | n/a | PENDING | Deferred by product owner (demo video work paused until the owner asks); reset measured at 1426.5 s on testnets (15.REC1) |
-| 19.RK5 | "Just monitoring": hero shot is a refused CCIP message | Attack Lab | n/a | PENDING | Real `ccipSend` refusal is coded in `demo/src/attack.ts`; not yet recorded on testnet (5.B5, 15.DS5) |
+| 19.RK5 | "Just monitoring": hero shot is a refused CCIP message | `demo/src/attack.ts` (real Router.ccipSend with native fee) | README "Testnet transactions" (passing `demo e2e --network testnet` run, 2026-10-07 05:32 to 07:03 UTC) rows refuse-ccip and refuse-ccip-pool | DONE | The hero refusal is a mined, reverted CCIP send: SenderTainted at the Guard, TokenNotConserved inside KirchhoffTokenPool |
 | 19.RK6 | Someone ships the same idea: ship first, publish the spec | n/a | n/a | PENDING | Submission |
 | 19.RK7 | Team split with another build: decide before hour 0 | n/a | one repo, one project | DONE | |
 | 19.OQ1 | Steps to require our CCV on lanes; aggregator onboarding | `docs/research/ccv.md` section 5, `ccv/STATUS.md` | n/a | DONE | Answered from docs: onchain steps self-serve, indexer onboarding by email; mentor confirmation still in HUMAN_TASKS |
