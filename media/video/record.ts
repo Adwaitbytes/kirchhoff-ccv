@@ -506,6 +506,9 @@ type Manifest = {
   voice: string | null;
 };
 
+/** How long a testnet take waits for the finality-lagged read model to leave RECOVERING after a reset. */
+const RECOVERY_CATCH_UP_MS = 25 * 60_000;
+
 async function prepare(o: Options): Promise<void> {
   const health = await http<{ ok: boolean; lab: boolean }>(`${o.api}/healthz`);
   if (!health.lab) throw new RecordError(`the API at ${o.api} has the Attack Lab disabled; start it with media/video/stack-up.sh`);
@@ -513,6 +516,14 @@ async function prepare(o: Options): Promise<void> {
   const lab = await http<{ run: { state: string } | null }>(`${o.api}/v1/lab/status`);
   if (lab.run?.state === "running") throw new RecordError("a Kelp Replay is already running");
   let t = await token(o.api);
+  if (o.network !== "local" && t.status === "RECOVERING") {
+    // The indexer mirrors home at its finalized block, ~15 min behind head on Sepolia, so a reset that just wrote
+    // RECOVERY_CHECK still reads RECOVERING here until that block finalizes.
+    t = await waitFor("the read model to catch up with the reset (RECOVERING to CONSERVED)", async () => {
+      const x = await token(o.api);
+      return x.status === "RECOVERING" ? null : x;
+    }, RECOVERY_CATCH_UP_MS, 15_000);
+  }
   if (t.status !== "CONSERVED" && t.status !== "UNKNOWN") {
     if (o.network !== "local") throw new RecordError(`kETH is ${t.status} on testnet; run demo/reset.ts --network testnet first`);
     log(`kETH is ${t.status}: demo reset on local`);
