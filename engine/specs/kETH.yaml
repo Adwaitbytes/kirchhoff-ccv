@@ -62,4 +62,6 @@ rules:
 response:
   on_broken: [freeze_ccip_lanes, taint_recipient, flip_feed, page_issuer]
   replay_requires: issuer_multisig
-  recovery_timelock_seconds: 3600
+  # Testnet demo token: 120 s so the Kelp Replay can reset between runs. A production spec uses 3600 or more
+  # (PRD section 6 example); the PRD shortens timelocks the same way for the testnet demo.
+  recovery_timelock_seconds: 120

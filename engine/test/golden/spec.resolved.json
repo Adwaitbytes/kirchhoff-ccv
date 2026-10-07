@@ -1,5 +1,5 @@
 {
-  "specHash": "0x1dd5bede49fb4512edc56c916ba2130dd9e6a9f9af53fb51a609f5bc8eeca11f",
+  "specHash": "0x33623844015c8e494c04057ab3fcc18b868b606a170dcc7b956d2c70e548e98e",
   "spec": {
     "specVersion": 1,
     "token": "kETH",
@@ -127,7 +127,7 @@
         "page_issuer"
       ],
       "replayRequires": "issuer_multisig",
-      "recoveryTimelockSeconds": "3600"
+      "recoveryTimelockSeconds": "120"
     }
   }
 }

@@ -2,7 +2,7 @@
   "workflow": "w2-loop",
   "token": "kETH",
   "tokenId": "0xe7cbc0ff4035309f71987d099a88ed33ef6bfd1a7d6c1050befb12561b95eb9c",
-  "specHash": "0x1dd5bede49fb4512edc56c916ba2130dd9e6a9f9af53fb51a609f5bc8eeca11f",
+  "specHash": "0x33623844015c8e494c04057ab3fcc18b868b606a170dcc7b956d2c70e548e98e",
   "spec": {
     "specVersion": 1,
     "token": "kETH",
@@ -130,7 +130,7 @@
         "page_issuer"
       ],
       "replayRequires": "issuer_multisig",
-      "recoveryTimelockSeconds": "3600"
+      "recoveryTimelockSeconds": "120"
     }
   },
   "model": "lock_release_home",
