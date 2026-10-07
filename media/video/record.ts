@@ -611,7 +611,7 @@ async function recordTake(o: Options): Promise<Manifest> {
     labRunId = lab.run?.id ?? null;
     await d.hold(4000);
     await d.cut();
-    const forge = await waitFor("forged credit tx in the attack log", () => attackEvents(clickedAt).find((e) => e.step === "forge-credit" && e.status === "ok" && e.txHash) ?? null, 120_000);
+    const forge = await waitFor("forged credit tx in the attack log", () => attackEvents(clickedAt).find((e) => e.step === "forge-credit" && e.status === "ok" && e.txHash) ?? null, 20 * 60_000);
     const forgeUrl = await showExplorer(page, o.network, work, "home", forge.txHash ?? "", "Forged WeakBridge credit: 116,500 kETH released with no burn");
     shown.push({ beat: "attack", chain: "home", hash: forge.txHash ?? "", what: "forged WeakBridge credit", url: forgeUrl });
     d.roll("explorer: forged release");
