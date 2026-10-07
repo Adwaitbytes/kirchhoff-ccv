@@ -4,7 +4,7 @@ import Ajv from "ajv";
 import { getAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import { parseArgs, reportMode } from "../src/cli.ts";
-import { rpcRotation, SIMULATE_ATTEMPTS } from "../src/cre.ts";
+import { failureLine, rpcRotation, SIMULATE_ATTEMPTS } from "../src/cre.ts";
 import { parseDotEnv } from "../src/env.ts";
 import { toEngineDeployments, type DeploymentSet, type RawDeployment } from "../src/deployments.ts";
 import { network } from "../src/networks.ts";
@@ -116,5 +116,15 @@ describe("cre provider rotation", () => {
     expect(rotation.RPC_ETH_SEPOLIA_1[0]).toBe("https://eth-sepolia.g.alchemy.com/v2/k");
     expect(rotation.RPC_ARB_SEPOLIA_1).toContain(repoEnv.RPC_ARB_SEPOLIA_1);
     expect(rotation.RPC_BASE_SEPOLIA_1).toContain(repoEnv.RPC_BASE_SEPOLIA_1);
+  });
+});
+
+describe("cre retry log", () => {
+  it("names the simulator error, else the first failing line, else the last line", () => {
+    expect(failureLine({ error: "workflow execution failed: boom", output: "" })).toBe("workflow execution failed: boom");
+    expect(failureLine({ error: null, output: "Initializing...\nChecking RPC connectivity...\n429 Too Many Requests\n" })).toBe("429 Too Many Requests");
+    expect(failureLine({ error: null, output: "Initializing...\nChecking RPC connectivity...\n" })).toBe("Checking RPC connectivity...");
+    expect(failureLine({ error: null, output: "" })).toBe("no output");
+    expect(failureLine({ error: "x".repeat(300), output: "" })).toHaveLength(243);
   });
 });

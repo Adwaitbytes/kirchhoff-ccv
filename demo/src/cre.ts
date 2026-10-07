@@ -132,6 +132,13 @@ async function simulateOnce(args: SimulateArgs, rotation = 0): Promise<SimulateR
 
 const backoffSeconds = (attempt: number): number => Math.min(10 * attempt, 60);
 
+/** The line that says why an attempt failed, so a retry log names the provider error instead of only retrying. */
+export function failureLine(result: Pick<SimulateResult, "error" | "output">): string {
+  const lines = result.output.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  const line = result.error ?? lines.find((l) => RATE_LIMITED.test(l) || /error|failed|✗/i.test(l)) ?? lines.at(-1) ?? "no output";
+  return line.length > 240 ? `${line.slice(0, 240)}...` : line;
+}
+
 export class SimulationError extends Error {
   override readonly name = "SimulationError";
 }
@@ -173,7 +180,7 @@ export async function simulate(
     if (limited) rotation++;
     // An expired CRE session fails every retry the same way; `cre whoami` exchanges the refresh token first.
     if (result.output.includes("Credential validation failed")) await refreshCreSession();
-    log(`  [${workflow}] ${limited ? `provider rate limited or missing state, rotating providers (set ${rotation})` : "CRE login transient"}; retry ${attempt + 1}/${SIMULATE_ATTEMPTS} in ${backoffSeconds(attempt)}s`);
+    log(`  [${workflow}] ${limited ? `provider rate limited or missing state, rotating providers (set ${rotation})` : "CRE login transient"}; retry ${attempt + 1}/${SIMULATE_ATTEMPTS} in ${backoffSeconds(attempt)}s: ${failureLine(result)}`);
     await new Promise((r) => setTimeout(r, backoffSeconds(attempt) * 1000));
     result = await simulateOnce({ ...args, wasm: await wasmFor(workflow, target) }, rotation);
   }
