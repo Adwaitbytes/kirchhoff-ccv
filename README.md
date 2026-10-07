@@ -25,8 +25,9 @@ It refuses a token transfer when the token's supply stops adding up across chain
 | Repository | https://github.com/Adwaitbytes/kirchhoff-ccv |
 | CI (typecheck, lint, tests with a Postgres 17 service, forge) | [GitHub Actions](https://github.com/Adwaitbytes/kirchhoff-ccv/actions), green on `6ad7ab8` ([run 37393797827](https://github.com/Adwaitbytes/kirchhoff-ccv/actions/runs/37393797827)) |
 
-Both deployments answered with `x-vercel-id: sin1` on 2026-10-06. The live read model is a mirror of the testnet
-ledgers and was last indexed at Sepolia block 11850609, before the testnet incidents below.
+Both deployments answer from Vercel `sin1`. The live read model mirrors the fresh deployment's ledgers
+(`0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA` on all three chains) through an indexer that follows the three testnets
+continuously into Neon (Singapore); the API served it at Sepolia block 11856439 on 2026-10-07.
 
 ## Contents
 
@@ -188,10 +189,11 @@ Workflow configs are generated from the KIRCH-SPEC by `engine/src/compile.ts`; n
 
 ## Deployed contracts (Testnet simulation)
 
-From [deployments/testnet.json](deployments/testnet.json) and `deployments/testnet-{home,arb,base}.raw.json`
-(written by `contracts/script/Deploy.s.sol`). Source verification was checked on 2026-10-05 through the Etherscan V2
-API: every contract below is verified on the linked explorer. The Arbitrum Sepolia `ConservationFeed` is verified on
-Blockscout only, so its link points there. Ledgers are in `simulation` forwarder mode (`forwarderMode() == 1`).
+Fresh deployment made inside the hackathon window, from [deployments/testnet.json](deployments/testnet.json) and
+`deployments/testnet-{home,arb,base}.raw.json` (written by `demo/deploy-all.ts` through `contracts/script/Deploy.s.sol`).
+Source verification was checked on 2026-10-07 through the Etherscan V2 API: all 26 KIRCHHOFF and demo contracts below
+report verified source. Ledgers run in `simulation` forwarder mode (reports arrive through Chainlink's
+`MockKeystoneForwarder` from `cre workflow simulate --broadcast`).
 
 kETH `tokenId` = `keccak256("kETH")` = `0xe7cbc0ff4035309f71987d099a88ed33ef6bfd1a7d6c1050befb12561b95eb9c`.
 
@@ -199,75 +201,98 @@ kETH `tokenId` = `keccak256("kETH")` = `0xe7cbc0ff4035309f71987d099a88ed33ef6bfd
 
 | Contract | Address |
 | --- | --- |
-| ConservationLedger | [`0x05fE18C1cb1FF308aF668a7abaAf6Ac3f623B5D3`](https://sepolia.etherscan.io/address/0x05fE18C1cb1FF308aF668a7abaAf6Ac3f623B5D3#code) |
-| QuarantineController | [`0xA3c539ccE9b4E6caCe97E8f4FD1346e1D885aC4a`](https://sepolia.etherscan.io/address/0xA3c539ccE9b4E6caCe97E8f4FD1346e1D885aC4a#code) |
-| ConservationFeed | [`0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d`](https://sepolia.etherscan.io/address/0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d#code) |
-| KirchhoffRegistry (10 minute testnet timelock) | [`0x98Ec613f16CF077De8b34a7C32f4b767cc90840e`](https://sepolia.etherscan.io/address/0x98Ec613f16CF077De8b34a7C32f4b767cc90840e#code) |
-| KirchhoffGuard | [`0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78`](https://sepolia.etherscan.io/address/0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78#code) |
-| KirchhoffLockReleaseTokenPool (Fallback B) | [`0x1c60f8B189E6Ea5F04C9510fAef5021605a22BDe`](https://sepolia.etherscan.io/address/0x1c60f8B189E6Ea5F04C9510fAef5021605a22BDe#code) |
-| ERC20LockBox (CCIP escrow) | [`0x8fa18a722eED4ef8C40C2552b92Db07ccdD6f899`](https://sepolia.etherscan.io/address/0x8fa18a722eED4ef8C40C2552b92Db07ccdD6f899) |
-| kETH (demo) | [`0xb270dcD4f512709DFAedBAab736888699BDa0273`](https://sepolia.etherscan.io/address/0xb270dcD4f512709DFAedBAab736888699BDa0273#code) |
-| HomeEscrowAdapter (demo) | [`0xdE9A6413AC2C29Cd6621f93FCD872eBB46b6a3D7`](https://sepolia.etherscan.io/address/0xdE9A6413AC2C29Cd6621f93FCD872eBB46b6a3D7#code) |
-| WeakBridge (demo, 1-of-1 verifier) | [`0x69B5096bA712A4dbc68d12408199dAD777Bb656d`](https://sepolia.etherscan.io/address/0x69B5096bA712A4dbc68d12408199dAD777Bb656d#code) |
-| DemoLendingMarket (demo) | [`0xE7d8ab11A07B2b4A913a1B04Ff17640e812Dc72A`](https://sepolia.etherscan.io/address/0xE7d8ab11A07B2b4A913a1B04Ff17640e812Dc72A#code) |
-| DemoUSD (demo) | [`0x13285199088416c76B5376EAaCb48625791fcAb3`](https://sepolia.etherscan.io/address/0x13285199088416c76B5376EAaCb48625791fcAb3#code) |
-| Issuer Safe (2 of 3) | [`0x1fdF6047B937b9536E6C2e2e01849D391cEAfc46`](https://sepolia.etherscan.io/address/0x1fdF6047B937b9536E6C2e2e01849D391cEAfc46) |
-| MockKeystoneForwarder (Chainlink, simulation) | [`0x15fC6ae953E024d975e77382eEeC56A9101f9F88`](https://sepolia.etherscan.io/address/0x15fC6ae953E024d975e77382eEeC56A9101f9F88) |
+| KirchhoffRegistry | [`0x48b5a12B107dd849DD390012aC643F0a29D685AB`](https://sepolia.etherscan.io/address/0x48b5a12B107dd849DD390012aC643F0a29D685AB#code) |
+| ConservationLedger | [`0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA`](https://sepolia.etherscan.io/address/0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA#code) |
+| QuarantineController | [`0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9`](https://sepolia.etherscan.io/address/0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9#code) |
+| ConservationFeed | [`0x937C381243CA23664bd858fc342fEa7801De5E8e`](https://sepolia.etherscan.io/address/0x937C381243CA23664bd858fc342fEa7801De5E8e#code) |
+| KirchhoffGuard | [`0x071b452B45bF9978B79A7A953F6cE8a258A444ed`](https://sepolia.etherscan.io/address/0x071b452B45bF9978B79A7A953F6cE8a258A444ed#code) |
+| KirchhoffTokenPool (Fallback B) | [`0xbD6164B658CfE68AD28ffc8053962940d87f20aB`](https://sepolia.etherscan.io/address/0xbD6164B658CfE68AD28ffc8053962940d87f20aB#code) |
+| ERC20LockBox (CCIP escrow) | [`0x12BdA4cA9F7C9Ae72B0F7Dae6B85e1a7973D1c08`](https://sepolia.etherscan.io/address/0x12BdA4cA9F7C9Ae72B0F7Dae6B85e1a7973D1c08#code) |
+| kETH (demo token) | [`0x89767Dab88D356DED2f5e5D153644E08505981c8`](https://sepolia.etherscan.io/address/0x89767Dab88D356DED2f5e5D153644E08505981c8#code) |
+| HomeEscrowAdapter (demo) | [`0x528Df7b17dc1702772cBc6a2ABD8eBA4E4260191`](https://sepolia.etherscan.io/address/0x528Df7b17dc1702772cBc6a2ABD8eBA4E4260191#code) |
+| WeakBridge (demo, single-key verifier) | [`0x012F441246C0C5318B80B58c9440AD25516331a7`](https://sepolia.etherscan.io/address/0x012F441246C0C5318B80B58c9440AD25516331a7#code) |
+| DemoLendingMarket (demo) | [`0x158dB8681e8E5b0f5a738129CED6FF7EbDA8C225`](https://sepolia.etherscan.io/address/0x158dB8681e8E5b0f5a738129CED6FF7EbDA8C225#code) |
+| DemoUSD (demo) | [`0xec5b7E4373c0013559162D5c51fE12F5ccb18cC4`](https://sepolia.etherscan.io/address/0xec5b7E4373c0013559162D5c51fE12F5ccb18cC4#code) |
+| MockKeystoneForwarder (Chainlink, simulation) | [`0x15fC6ae953E024d975e77382eEeC56A9101f9F88`](https://sepolia.etherscan.io/address/0x15fC6ae953E024d975e77382eEeC56A9101f9F88#code) |
 
-### Arbitrum Sepolia (chain id 421614, selector 3478487238524512106)
-
-| Contract | Address |
-| --- | --- |
-| ConservationLedger | [`0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0`](https://sepolia.arbiscan.io/address/0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0#code) |
-| QuarantineController | [`0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f`](https://sepolia.arbiscan.io/address/0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f#code) |
-| ConservationFeed (verified on Blockscout) | [`0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96`](https://arbitrum-sepolia.blockscout.com/address/0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96?tab=contract) |
-| KirchhoffGuard | [`0xa2B051D83c953293ed425D7042551b83E986C37D`](https://sepolia.arbiscan.io/address/0xa2B051D83c953293ed425D7042551b83E986C37D#code) |
-| KirchhoffBurnMintTokenPool (Fallback B) | [`0x98Ec613f16CF077De8b34a7C32f4b767cc90840e`](https://sepolia.arbiscan.io/address/0x98Ec613f16CF077De8b34a7C32f4b767cc90840e#code) |
-| RemoteKETH (demo) | [`0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d`](https://sepolia.arbiscan.io/address/0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d#code) |
-| WeakBridge (demo) | [`0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78`](https://sepolia.arbiscan.io/address/0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78#code) |
-| MockKeystoneForwarder (Chainlink, simulation) | [`0xD41263567DdfeAd91504199b8c6c87371e83ca5d`](https://sepolia.arbiscan.io/address/0xD41263567DdfeAd91504199b8c6c87371e83ca5d) |
-
-### Base Sepolia (chain id 84532, selector 10344971235874465080)
+### Arbitrum Sepolia (remote, chain id 421614, selector 3478487238524512106)
 
 | Contract | Address |
 | --- | --- |
-| ConservationLedger | [`0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0`](https://sepolia.basescan.org/address/0xe4908004644C0f52Ea56Ce747AAcc08B693A4aE0#code) |
-| QuarantineController | [`0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f`](https://sepolia.basescan.org/address/0xFC052cdb453D3fB94770a88A4C1F03cB5CE84E2f#code) |
-| ConservationFeed | [`0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96`](https://sepolia.basescan.org/address/0xbf31A944Dc417a8BF1b167FE6362d2404FE06F96#code) |
-| KirchhoffGuard | [`0xa2B051D83c953293ed425D7042551b83E986C37D`](https://sepolia.basescan.org/address/0xa2B051D83c953293ed425D7042551b83E986C37D#code) |
-| KirchhoffBurnMintTokenPool (Fallback B) | [`0x98Ec613f16CF077De8b34a7C32f4b767cc90840e`](https://sepolia.basescan.org/address/0x98Ec613f16CF077De8b34a7C32f4b767cc90840e#code) |
-| RemoteKETH (demo) | [`0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d`](https://sepolia.basescan.org/address/0x93EEc1BA5a782ceB99e76Eec6736D900c1cB002d#code) |
-| WeakBridge (demo) | [`0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78`](https://sepolia.basescan.org/address/0x9bB3062C74C97768b83F48AC2F2bAe38A1dB5D78#code) |
-| MockKeystoneForwarder (Chainlink, simulation) | [`0x82300bd7c3958625581cc2F77bC6464dcEcDF3e5`](https://sepolia.basescan.org/address/0x82300bd7c3958625581cc2F77bC6464dcEcDF3e5) |
+| ConservationLedger | [`0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA`](https://sepolia.arbiscan.io/address/0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA#code) |
+| QuarantineController | [`0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9`](https://sepolia.arbiscan.io/address/0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9#code) |
+| ConservationFeed | [`0x937C381243CA23664bd858fc342fEa7801De5E8e`](https://sepolia.arbiscan.io/address/0x937C381243CA23664bd858fc342fEa7801De5E8e#code) |
+| KirchhoffGuard | [`0x071b452B45bF9978B79A7A953F6cE8a258A444ed`](https://sepolia.arbiscan.io/address/0x071b452B45bF9978B79A7A953F6cE8a258A444ed#code) |
+| KirchhoffTokenPool (Fallback B) | [`0x89767Dab88D356DED2f5e5D153644E08505981c8`](https://sepolia.arbiscan.io/address/0x89767Dab88D356DED2f5e5D153644E08505981c8#code) |
+| RemoteKETH (demo token) | [`0x48b5a12B107dd849DD390012aC643F0a29D685AB`](https://sepolia.arbiscan.io/address/0x48b5a12B107dd849DD390012aC643F0a29D685AB#code) |
+| WeakBridge (demo, single-key verifier) | [`0x50db1f9fDc7c015A46d12E090C2C46B4C842D779`](https://sepolia.arbiscan.io/address/0x50db1f9fDc7c015A46d12E090C2C46B4C842D779#code) |
+| MockKeystoneForwarder (Chainlink, simulation) | [`0xD41263567DdfeAd91504199b8c6c87371e83ca5d`](https://sepolia.arbiscan.io/address/0xD41263567DdfeAd91504199b8c6c87371e83ca5d#code) |
 
-Same-looking addresses on different chains are different contracts: the deployer's nonces line up across chains.
+### Base Sepolia (remote, chain id 84532, selector 10344971235874465080)
 
-**Onchain state:** the issuer Safe activated kETH spec `0x22c75309...5dfe` in Sepolia tx
-[`0x43b895d4...0b87`](https://sepolia.etherscan.io/tx/0x43b895d497415fb985b90fcc18032395d465868ac3eef2f07c8cc22f3e740b87). The ledgers have since been
-CONSERVED, BROKEN, QUARANTINED, RECOVERING and CONSERVED again (next section). A full passing `demo e2e --network
-testnet` run has not been recorded yet; see [PRD_TRACEABILITY.md](PRD_TRACEABILITY.md) "Pending work".
+| Contract | Address |
+| --- | --- |
+| ConservationLedger | [`0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA`](https://sepolia.basescan.org/address/0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA#code) |
+| QuarantineController | [`0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9`](https://sepolia.basescan.org/address/0xBf152550ed1D8E2DDc05E8427967FcDe552C7ed9#code) |
+| ConservationFeed | [`0x937C381243CA23664bd858fc342fEa7801De5E8e`](https://sepolia.basescan.org/address/0x937C381243CA23664bd858fc342fEa7801De5E8e#code) |
+| KirchhoffGuard | [`0x071b452B45bF9978B79A7A953F6cE8a258A444ed`](https://sepolia.basescan.org/address/0x071b452B45bF9978B79A7A953F6cE8a258A444ed#code) |
+| KirchhoffTokenPool (Fallback B) | [`0x89767Dab88D356DED2f5e5D153644E08505981c8`](https://sepolia.basescan.org/address/0x89767Dab88D356DED2f5e5D153644E08505981c8#code) |
+| RemoteKETH (demo token) | [`0x48b5a12B107dd849DD390012aC643F0a29D685AB`](https://sepolia.basescan.org/address/0x48b5a12B107dd849DD390012aC643F0a29D685AB#code) |
+| WeakBridge (demo, single-key verifier) | [`0x50db1f9fDc7c015A46d12E090C2C46B4C842D779`](https://sepolia.basescan.org/address/0x50db1f9fDc7c015A46d12E090C2C46B4C842D779#code) |
+| MockKeystoneForwarder (Chainlink, simulation) | [`0x82300bd7c3958625581cc2F77bC6464dcEcDF3e5`](https://sepolia.basescan.org/address/0x82300bd7c3958625581cc2F77bC6464dcEcDF3e5#code) |
+
+Issuer Safe (2 of 3, same address on all three chains): `0xBc614b7965e4A6c3B3cDB73A1A377434460585aA`.
+
+Active kETH spec hash: `0xeb44896b07b91777fd04a9826122e927f5d87d1097be7cea81944fc4e39774da` (120 s testnet recovery
+timelock, proposed by the issuer Safe and activated through the KirchhoffRegistry timelock).
 
 ## Testnet transactions (Testnet simulation)
 
-Every write below is a CRE report from `cre workflow simulate --broadcast` through Chainlink's
-`MockKeystoneForwarder`, or an issuer Safe transaction. Sources: [workflows/SIMULATION_LOG.md](workflows/SIMULATION_LOG.md)
-"Staging", `demo/logs/testnet-run1c.log`, `demo/logs/testnet-reset0.log`, and `cast logs` of the ledgers'
-`StatusChanged` events (read 2026-10-06).
+One complete `pnpm --filter @kirchhoff/demo e2e --network testnet` run on the fresh deployment, 2026-10-07 05:32 to
+07:03 UTC, result **e2e PASSED**: the pre-run recovery of an earlier attempt, a CONSERVED baseline, the forged
+WeakBridge credit, W1 BREACH on all three ledgers in one CRE run, W3 quarantine, the onchain refusals, the W2 Loop Rule
+epoch asserting delta -116,500 kETH, and the reset back to CONSERVED. Every ledger write is a CRE report from
+`cre workflow simulate --broadcast`; Safe rows are 2 of 3 issuer Safe transactions; refusals are mined, reverted
+transactions with their revert reason.
 
-| Step | Ethereum Sepolia | Arbitrum Sepolia | Base Sepolia | Source |
+| Step | Chain | What happened | Revert reason | Transaction |
 | --- | --- | --- | --- | --- |
-| First W2 EPOCH, CONSERVED, Δ = 0 | [`0x76ee71ed...c531`](https://sepolia.etherscan.io/tx/0x76ee71edfbec4134d5a9ee230048f0ff3ae6cee91fa5d2ce1de26ef38919c531) | [`0x3b978a23...4f40`](https://sepolia.arbiscan.io/tx/0x3b978a2381ca4418832d9d53923ed991eb21b1a365e2a63e3c64cf1ee2b14f40) | [`0x3502300f...9f77`](https://sepolia.basescan.org/tx/0x3502300f5d082a9e50f8e1e2f47acac84f0a8609b4e499c5934f6c1394599f77) | SIMULATION_LOG.md |
-| W2 Loop Rule BREACH, `LOOP_DEFICIT`, Δ = -116,500 kETH | [`0x6bb14ec7...b02d`](https://sepolia.etherscan.io/tx/0x6bb14ec73e263eea554154feda635f026b13fcfad753bac8a290a6b98f0ab02d) | [`0x64801650...63ca`](https://sepolia.arbiscan.io/tx/0x648016504d042e63582bef6e5167aabf2c18b295b65775c03ca1de87e90563ca) | [`0x54450b7f...b1a4`](https://sepolia.basescan.org/tx/0x54450b7feb0294c3fda9f9c4e04570d327e2d55bfe41501c07fe1c90a495b1a4) | testnet-run1c.log |
-| W3 `QUARANTINE_APPLIED` (BROKEN to QUARANTINED) | [`0x2c1d6fb1...8940`](https://sepolia.etherscan.io/tx/0x2c1d6fb16209dd30636cc59847900a1ef8de82d78bae4c980f1ecf4f9f2e8940) | [`0x41adcd13...dd03`](https://sepolia.arbiscan.io/tx/0x41adcd136a8b19d08d9adfcf081a99ae76265645b1de4df574844f8346fddd03) | [`0x61eb71d2...7a0a`](https://sepolia.basescan.org/tx/0x61eb71d2ab7f6b690700471fa085a40e0dc524d85de12e1e72546485c71c7a0a) | `cast logs StatusChanged` |
-| Issuer Safe (2 of 3) resolves the incident (QUARANTINED to RECOVERING) | [`0x40c05574...bbc8`](https://sepolia.etherscan.io/tx/0x40c05574e0d8089d5c993a11e2dea3e273273d01dbf4fd3be9de7ad70c56bbc8) | [`0x30e614b9...4c0c`](https://sepolia.arbiscan.io/tx/0x30e614b9477d03340e65fb1b7ace966585658e5c192de74edf14a0a7fcc04c0c) | [`0xfde237b6...2c1b`](https://sepolia.basescan.org/tx/0xfde237b6f0aa2fa293902f9dfc5d47de1a2d8555d124d83ee47b9527e3d32c1b) | testnet-reset0.log |
-| Return 116,500 kETH to the escrow | [`0x181a43b9...c933`](https://sepolia.etherscan.io/tx/0x181a43b99a090e9c4b897bea05f80797edccb44f1efe1f0b1664b21dd871c933) | | | testnet-reset0.log |
-| W2 `RECOVERY_CHECK`, back to CONSERVED | [`0xdae3a5e2...95f6`](https://sepolia.etherscan.io/tx/0xdae3a5e2c164256c0318327cae979ced593d774c8513e0650e574ab55c7195f6) | [`0x6921b7f9...3b81`](https://sepolia.arbiscan.io/tx/0x6921b7f91f02c48fb3e16ac92015f4817a13b88c031668e515c0e04892c73b81) | [`0x16eb636d...3c3e`](https://sepolia.basescan.org/tx/0x16eb636d38901341cfcad39b2640e4c99190a806772363bdee85d39f02193c3e) | testnet-reset0.log |
+| recovery-check | home | EPOCH written on home by CRE |  | [`0x30e5373b...376e`](https://sepolia.etherscan.io/tx/0x30e5373b995cd8987e55a8616382fd9b4e4ba51ad379e56a546c6f3fa9c5376e) |
+| recovery-check | arb | EPOCH written on arb by CRE |  | [`0x67a92177...904f`](https://sepolia.arbiscan.io/tx/0x67a9217741654ab6beee209e1d32d2ce10cdd72a683f574e3b40a9c6c9b1904f) |
+| recovery-check | base | RECOVERY_CHECK written on base by CRE |  | [`0xe0bb45c9...a569`](https://sepolia.basescan.org/tx/0xe0bb45c9296142cadb53761914765f35868d9bef12284773c8ba821104faa569) |
+| baseline-epoch | home | EPOCH written on home by CRE |  | [`0x3d820d3b...8c47`](https://sepolia.etherscan.io/tx/0x3d820d3b901e0175d6a07d01e5e886821cf0262ac7c8184212465cda45458c47) |
+| baseline-epoch | arb | EPOCH written on arb by CRE |  | [`0x1b996cbb...8746`](https://sepolia.arbiscan.io/tx/0x1b996cbb8dcbe2979e324072340bd465b6b2fc7d03a518b1dcae4dc311588746) |
+| baseline-epoch | base | RECOVERY_CHECK written on base by CRE |  | [`0xb367d4d4...1c28`](https://sepolia.basescan.org/tx/0xb367d4d45e3975500e668f2bbac2bbbaaddc5aab113ff2da71f8287dda941c28) |
+| forge-credit | home | released 116,500 kETH to attacker with no debit |  | [`0x6367b107...1d4a`](https://sepolia.etherscan.io/tx/0x6367b1078c2b7662378c56ed5a756f87a0f3f61697b7c1b35d5cf634befd1d4a) |
+| breach | home | BREACH written on home by CRE |  | [`0xddbdd934...6e70`](https://sepolia.etherscan.io/tx/0xddbdd934f11527a879f6c8b0e89db6ae8784d59549906bd2f0daa92431f66e70) |
+| breach | arb | BREACH written on arb by CRE |  | [`0x2381e453...db14`](https://sepolia.arbiscan.io/tx/0x2381e4531ad6eff6fce46c0da2ef9d3a497d5f214f3924227d070ee838bddb14) |
+| breach | base | BREACH written on base by CRE |  | [`0x3e0afa11...5015`](https://sepolia.basescan.org/tx/0x3e0afa11fddd16776213b80c6c770b6022f740103746a91cd26cab5a7ee95015) |
+| quarantine | home | QUARANTINE_APPLIED written on home by CRE |  | [`0xa0bed840...9b9f`](https://sepolia.etherscan.io/tx/0xa0bed840ae6b98455b7a0ae90972f19f7eae7ba720913431cfd8f1f2bdde9b9f) |
+| quarantine | arb | QUARANTINE_APPLIED written on arb by CRE |  | [`0xcd2a55fc...a75d`](https://sepolia.arbiscan.io/tx/0xcd2a55fca60fcc9e1d0fe446ee514519686a9d5981c8b46651c223f82c70a75d) |
+| quarantine | base | QUARANTINE_APPLIED written on base by CRE |  | [`0x594b0975...6ad1`](https://sepolia.basescan.org/tx/0x594b0975fa4f5271477ec4777e3c50c1c586ec574bbe7e4105beae96717f6ad1) |
+| refuse-ccip | home | attacker ccipSend reverted onchain (Router pulls tokens first: KirchhoffGuard) | `SenderTainted(0xD04C90127279E40dba7477dc` | [`0xf663e2bd...6345`](https://sepolia.etherscan.io/tx/0xf663e2bda9e6ff18746648f1989de02985f19d11222430cd757ec749a86e6345) |
+| refuse-ccip-pool | home | ccipSend reverted inside KirchhoffTokenPool (lanes frozen) | `TokenNotConserved(0xe7cbc0ff4035309f7198` | [`0x4380c01f...6ea9`](https://sepolia.etherscan.io/tx/0x4380c01f3b0d442e4657329ca7af79938b89f32cd0755c5a2b0c5357d35a6ea9) |
+| refuse-guard | home | home transfer reverted (KirchhoffGuard) | `SenderTainted(0xD04C90127279E40dba7477dc` | [`0xd299af11...fa10`](https://sepolia.etherscan.io/tx/0xd299af1166b323552a95c9ebb8ed8bb116f436758615e5ef62306368bf56fa10) |
+| refuse-borrow | home | borrow reverted (CollateralBroken) | `CollateralBroken()` | [`0x2e805c6c...cbcc`](https://sepolia.etherscan.io/tx/0x2e805c6cdd89166861b2a3b2ad82651c62e6a52bd38080a1560700aae58bcbcc) |
+| loop-epoch | home | BREACH written on home by CRE |  | [`0x6965d977...5837`](https://sepolia.etherscan.io/tx/0x6965d977fe951dd8c7309401ac1f525118734f4b2286970abf12c4dd4a045837) |
+| loop-epoch | arb | BREACH written on arb by CRE |  | [`0x5805b9df...0ea3`](https://sepolia.arbiscan.io/tx/0x5805b9dfe6299eeeb6019675db17bf31eee5d2c69230d9b84a2dd4d806460ea3) |
+| loop-epoch | base | BREACH written on base by CRE |  | [`0xf8e47a57...cef1`](https://sepolia.basescan.org/tx/0xf8e47a57931325cf1673d83ead275bace6f7884d2b5927070bb001e699f2cef1) |
+| resolve | home | issuer Safe resolved incident on home |  | [`0xf3a23094...96cc`](https://sepolia.etherscan.io/tx/0xf3a230946eae0eaf300d4db37acf2716f667720decdcf91997a460422f3896cc) |
+| resolve | arb | issuer Safe resolved incident on arb |  | [`0xb7bc7383...869e`](https://sepolia.arbiscan.io/tx/0xb7bc7383393361132351bd11d5a0c22e2ef1a84d8147ef4d2b263da6a79f869e) |
+| resolve | base | issuer Safe resolved incident on base |  | [`0xd7c2ace3...d8c0`](https://sepolia.basescan.org/tx/0xd7c2ace3bfc23778ec87826f68c8f21789729686f15e7af504061745e34ed8c0) |
+| untaint | home | attacker untainted on home |  | [`0x79042689...60cc`](https://sepolia.etherscan.io/tx/0x79042689d61d0a2cfc07bf3e6c1038dbf5c90e72349475b5eec6a12aa67560cc) |
+| untaint | arb | attacker untainted on arb |  | [`0xed80dda2...004d`](https://sepolia.arbiscan.io/tx/0xed80dda2c106195774aca1292600563058f3ed5b4b4df9eba73fe10cbaf0004d) |
+| untaint | base | attacker untainted on base |  | [`0xfb2d17fe...6e7f`](https://sepolia.basescan.org/tx/0xfb2d17fee23101d713973bda799f2084dacd1f17d76f79a3dfdd513a8a206e7f) |
+| rebalance | home | returned 116500000000000000000000 kETH to escrow; Δ back to 0 |  | [`0x81b95bf2...4674`](https://sepolia.etherscan.io/tx/0x81b95bf2f8a67bdb549d9ff2e821d486cec21f3e46045d7d7bc4bcbe33134674) |
+| recovery-check | home | RECOVERY_CHECK written on home by CRE |  | [`0x332d9310...9b40`](https://sepolia.etherscan.io/tx/0x332d93107544647c3f4c1e80c6131bf4713d5ed965049a749b62e71ea7249b40) |
+| recovery-check | arb | RECOVERY_CHECK written on arb by CRE |  | [`0x78101ce4...7c22`](https://sepolia.arbiscan.io/tx/0x78101ce473e3defe4712bf87908c652b1bd35c1ed47e1df5de62a7d6c80e7c22) |
+| recovery-check | base | RECOVERY_CHECK written on base by CRE |  | [`0x8735e973...e0a8`](https://sepolia.basescan.org/tx/0x8735e973cb17b2343ac556222a335e802231091e9241a46f1e26f739931ee0a8) |
 
-On Sepolia the ledger had already turned BROKEN in an earlier CRE report,
-[`0x7c368432...b4a2`](https://sepolia.etherscan.io/tx/0x7c368432fce00fc809a8d0e2064bf6d073b37aec5c8fefc71c20d8a76661b4a2); the BREACH above is idempotent per
-incident there (Deviation D13). The e2e run that wrote these BREACHes failed its own baseline assert: an earlier attack
-run had already released 116,500 kETH and died before containment; commit `6ad7ab8` makes `reset` contain
-such dangling incidents first. The forged release itself and the CCIP refusal have no recorded testnet log yet.
+Measured on this run (`demo/e2e.ts` latency step): forged credit to BROKEN onchain via the Junction Rule in 1,236 s
+and via the Loop Rule in 2,328 s. Both are dominated by waiting for the claimed source chain (Arbitrum Sepolia) and
+Sepolia to finalize, because verdicts only read finalized blocks (PRD 14 threat 6); on three local chains the same
+path takes 2 to 4 s after confidence (workflows/SIMULATION_LOG.md scenario 7). The reset took about 25 minutes for the
+same reason; locally it takes 28.2 s (demo/E2E_LOG.md).
 
 ## CRE workflows
 
@@ -416,15 +441,15 @@ Every number here was measured; the file that holds the raw output is linked.
 | What | Result | Source |
 | --- | --- | --- |
 | Judge at 100 rps, in-process stub RPCs (k6, 60 s) | p50 3.64 ms, p99 6.13 ms, 0 of 6001 failed | [judge/load/RESULTS.md](judge/load/RESULTS.md) run A |
-| Judge at 100 rps, 3 private Anvil chains | p50 3.46 ms, p99 485.9 ms (misses the 300 ms target; the tail is Anvil, see the file) | [judge/load/RESULTS.md](judge/load/RESULTS.md) run B |
+| Judge at 100 rps, real contracts on Anvil, two independent providers, quiet machine (k6, 60 s) | p50 4.26 ms, **p99 9.31 ms**, 0 of 6001 failed (target under 300 ms) | [judge/load/RESULTS.md](judge/load/RESULTS.md) run D (runs B and C, at machine load 15 to 54, are kept there for the record) |
 | Judge, single signed request against the live testnet deployment | 21.3 to 26.6 ms | [judge/README.md](judge/README.md) "Live testnet check" |
 | Judge debit lookup through two keyless public Sepolia RPCs | 397 to 677 ms per message | [judge/load/RESULTS.md](judge/load/RESULTS.md) "Against real testnet RPCs" |
 | Judge under chaos (provider killed, W2 paused) | every answer inside 11 ms, PENDING as HTTP 503 | [judge/CHAOS.md](judge/CHAOS.md) |
 | Forged credit to BREACH | same W1 run as the credit event (scenario 3) | [workflows/SIMULATION_LOG.md](workflows/SIMULATION_LOG.md) |
 | Loop Rule breach to BROKEN onchain (scenario 7, Anvil, 1 s blocks) | BREACH mined 2 / 3 / 4 s after confidence on home / arb / base; single-node simulation, excludes DON trigger delivery | [workflows/SIMULATION_LOG.md](workflows/SIMULATION_LOG.md) scenario 7 |
-| Testnet `reset` (Safe resolutions, rebalance, timelock, RECOVERY_CHECK on 3 chains) | 1426.5 s, over the 3-minute target; most of it waiting for Sepolia, Arbitrum and Base finality | `demo/logs/testnet-reset0.log` |
-| Loop Rule breach to BROKEN on public testnets | pending measurement | |
-| Spec Copilot onboarding time for kETH | pending measurement | |
+| `reset` back to CONSERVED | 28.2 s on three local chains; about 25 min on public testnets, almost all of it waiting for Sepolia, Arbitrum and Base finality | [demo/E2E_LOG.md](demo/E2E_LOG.md); testnet run in "Testnet transactions" |
+| Forged credit to BROKEN onchain on public testnets (passing e2e run, 2026-10-07) | Junction Rule 1,236 s, Loop Rule 2,328 s, dominated by source-chain finality | "Testnet transactions" above (`demo/e2e.ts` latency step) |
+| Spec Copilot onboarding of kETH on testnet | 111.6 s, 49 of 49 fields, validated first draft (target under 10 min) | [ai/eval/TESTNET_ONBOARDING.md](ai/eval/TESTNET_ONBOARDING.md) |
 
 ## Roadmap and business
 
