@@ -1,11 +1,12 @@
-import { Status } from "@kirchhoff/engine";
-import { parseAbiItem, type Address } from "viem";
+import { Reason, Status } from "@kirchhoff/engine";
+import { keccak256, parseAbiItem, toHex, type Address } from "viem";
 import { erc20Abi, ledgerAbi, quarantineAbi } from "./abi.ts";
 import { account, read, send } from "./chain.ts";
 import { type Context } from "./context.ts";
 import { readState } from "./deployments.ts";
 import { log, type stepEmitter } from "./events.ts";
 import { emitWrites } from "./attack.ts";
+import { w1TriggerIndex } from "./cre.ts";
 import { runWorkflow, settle } from "./engine-run.ts";
 import { ROLES, type ChainRole } from "./networks.ts";
 import { nextEpochId, quarantineBody, recoveryBody, writeReportDirect } from "./reports.ts";
@@ -60,6 +61,9 @@ async function waitRecoveryTimelock(ctx: Context, emit: Emit): Promise<void> {
   emit({ step: "timelock", status: "ok", title: "recovery timelock elapsed" });
 }
 
+const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
+const RELEASED_TOPIC = keccak256(toHex("Released(bytes32,address,uint256,uint64)"));
+
 const BREACH_RECORDED = parseAbiItem(
   "event BreachRecorded(bytes32 indexed tokenId, uint16 reason, bytes32 evidenceHash, uint64 offendingChain, bytes32 offendingTx, address recipient, uint256 amount)",
 );
@@ -78,9 +82,21 @@ async function containDangling(ctx: Context, emit: Emit, mode: ReportMode): Prom
   }
   for (const [incident, roles] of pending) {
     const role = roles[0] ?? "home";
-    const breach = await read<{ evidenceHash: `0x${string}`; recipient: Address }>(ctx.chains[role], { to: ctx.at(role, "conservationLedger"), abi: ledgerAbi, functionName: "breachOf", args: [incident] });
+    const breach = await read<{ evidenceHash: `0x${string}`; recipient: Address; offendingTx: `0x${string}`; reason: number }>(ctx.chains[role], { to: ctx.at(role, "conservationLedger"), abi: ledgerAbi, functionName: "breachOf", args: [incident] });
     if (mode === "cre") {
-      const log = await findBreachLog(ctx, breach.evidenceHash);
+      let log = await findBreachLog(ctx, breach.evidenceHash);
+      // A W1 run whose BREACH landed on some ledgers but not on home (e.g. one write ran out of gas) leaves no home log
+      // for W3. Redeliver W1 on the same forged credit, as the DON would: the home ledger records the breach and the
+      // others treat the repeat incident as a no-op.
+      if (log === null && breach.reason === Reason.DEBIT_NOT_FOUND && breach.offendingTx !== ZERO_HASH) {
+        const receipt = await ctx.chains.home.client.getTransactionReceipt({ hash: breach.offendingTx });
+        const eventIndex = receipt.logs.findIndex((l) => l.address.toLowerCase() === ctx.at("home", "homeEscrowAdapter").toLowerCase() && l.topics[0]?.toLowerCase() === RELEASED_TOPIC);
+        if (eventIndex !== -1) {
+          const w1 = await runWorkflow(ctx, "w1-junction", w1TriggerIndex(ctx.net.name, ctx.net.chains.home), { txHash: breach.offendingTx, eventIndex });
+          emitWrites(emit, "contain-dangling", w1);
+          log = await findBreachLog(ctx, breach.evidenceHash);
+        }
+      }
       if (log !== null) {
         const run = await runWorkflow(ctx, "w3-responder", 0, log);
         emitWrites(emit, "contain-dangling", run);
