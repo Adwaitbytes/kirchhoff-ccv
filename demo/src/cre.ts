@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { execFile } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { promisify } from "node:util";
 import { buildWasm, parseSimulateOutput, simulateCommand, type SimulateArgs, type SimulateResult } from "@kirchhoff/workflows/scripts/lib/cre.ts";
@@ -42,8 +43,23 @@ const TRANSIENT = /Credential validation failed|context deadline exceeded|unable
  */
 const WASM_CACHE = join(homedir(), ".cache", "kirchhoff-demo");
 
+/** Hash of everything the WASM is compiled from, so a source change (e.g. a gas limit) never reuses a stale build. */
+function sourceDigest(workflow: Workflow): string {
+  const hash = createHash("sha256");
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entry.name === "node_modules" || entry.name.endsWith(".wasm")) continue;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (/\.(ts|json|yaml)$/.test(entry.name)) hash.update(path).update(readFileSync(path));
+    }
+  };
+  for (const dir of [join(WORKFLOWS_DIR, "src"), join(WORKFLOWS_DIR, workflow), join(REPO_ROOT, "engine", "src")]) walk(dir);
+  return hash.digest("hex").slice(0, 10);
+}
+
 async function wasmFor(workflow: Workflow, target: "local" | "staging"): Promise<string> {
-  const cached = join(WASM_CACHE, `${target}-${workflow}.wasm`);
+  const cached = join(WASM_CACHE, `${target}-${workflow}-${sourceDigest(workflow)}.wasm`);
   if (existsSync(cached)) return cached;
   log(`$ cre workflow build ./${workflow} --target ${target}`);
   const built = await buildWasm(WORKFLOWS_DIR, workflow, target);
