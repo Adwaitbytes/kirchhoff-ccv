@@ -23,13 +23,16 @@ export type ReportBody =
 /**
  * Gas for one `onReport` through the forwarder. A BREACH also freezes lanes and taints in the
  * QuarantineController; the forwarder itself needs ~130k (docs/research/cre-contracts.md section 6a).
- * Well under the 10M CRE transaction gas limit.
+ * Measured on Sepolia (2026-10-07, fork replay of a first-incident BREACH): 1.54M gas end to end, because the
+ * report writes fresh storage (breach record, incident, lane freeze, taint) and new slots are expensive there.
+ * The old 1.5M budget made onBreach run out of gas, so the forwarder recorded ReportProcessed(false). Roughly 2x
+ * headroom on every write path, still well under the 10M CRE transaction gas limit.
  */
 export const REPORT_GAS_LIMIT: Readonly<Record<ReportBody["reportType"], bigint>> = {
-  [ReportType.EPOCH]: 1_500_000n,
-  [ReportType.BREACH]: 1_500_000n,
-  [ReportType.QUARANTINE_APPLIED]: 1_500_000n,
-  [ReportType.RECOVERY_CHECK]: 1_000_000n,
+  [ReportType.EPOCH]: 2_500_000n,
+  [ReportType.BREACH]: 3_500_000n,
+  [ReportType.QUARANTINE_APPLIED]: 3_000_000n,
+  [ReportType.RECOVERY_CHECK]: 2_000_000n,
 };
 
 /** The INTERFACES.md envelope for one ledger: `abi.encode(reportType, chainSelector, ledger, tokenId, payload)`. */
