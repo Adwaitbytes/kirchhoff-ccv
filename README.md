@@ -23,7 +23,7 @@ It refuses a token transfer when the token's supply stops adding up across chain
 | Mission Control (read-only, Vercel `sin1`) | https://kirchhoff-two.vercel.app |
 | Public API (Vercel `sin1`, SSE stream) | https://kirchhoff-api.vercel.app (`/healthz`, `/v1/tokens`, `/v1/tokens/kETH/status`) |
 | Repository | https://github.com/Adwaitbytes/kirchhoff-ccv |
-| CI (typecheck, lint, tests with a Postgres 17 service, forge) | [GitHub Actions](https://github.com/Adwaitbytes/kirchhoff-ccv/actions), green on `6ad7ab8` ([run 37393797827](https://github.com/Adwaitbytes/kirchhoff-ccv/actions/runs/37393797827)) |
+| CI (typecheck, lint, tests with a Postgres 17 service, forge) | [GitHub Actions](https://github.com/Adwaitbytes/kirchhoff-ccv/actions), green on `5fcfc4f` ([run 38681992420](https://github.com/Adwaitbytes/kirchhoff-ccv/actions/runs/38681992420)) |
 
 Both deployments answer from Vercel `sin1`. The live read model mirrors the fresh deployment's ledgers
 (`0x3C1DE69BA8E3A337cFe44Ee16696B3bC7B8613aA` on all three chains) through an indexer that follows the three testnets
@@ -410,26 +410,26 @@ a CCV verifier roughly 13 to 17 minutes after the send ([docs/research/ccip.md](
 ## Test results
 
 TypeScript and Foundry counts are from the green GitHub CI run
-[37393797827](https://github.com/Adwaitbytes/kirchhoff-ccv/actions/runs/37393797827) on commit `6ad7ab8` (2026-10-06,
+[38681992420](https://github.com/Adwaitbytes/kirchhoff-ccv/actions/runs/38681992420) on commit `5fcfc4f` (2026-10-15,
 `pnpm -r test` with a Postgres 17 service, the engine coverage gate, `forge test -vv`). Playwright counts are from the
 local report of 2026-10-06 (commit `230054a`); Playwright does not run in CI.
 
 | Package | Command | Result |
 | --- | --- | --- |
-| Engine | `pnpm --filter @kirchhoff/engine test` | 251 passed (14 files) |
+| Engine | `pnpm --filter @kirchhoff/engine test` | 328 passed (16 files) |
 | Engine coverage | `pnpm --filter @kirchhoff/engine coverage` | 100% statements, branches, functions and lines (CI gate); 2026-10-05 local run: 894/894, 586/586, 203/203, 736/736 |
 | Engine property test | `engine/test/property.test.ts` "holds over 10,000 random histories" | 10,000 runs (`numRuns: 10_000`): every forgery flagged, zero false flags on valid traffic |
 | Contracts | `cd contracts && forge test` | 150 passed, 0 failed (10 suites: unit, fuzz at 1024 runs, invariants at 256 runs x depth 64, real KeystoneForwarder signature path) |
-| Workflows | `pnpm --filter @kirchhoff/workflows test` | 54 passed |
+| Workflows | `pnpm --filter @kirchhoff/workflows test` | 55 passed |
 | Workflows, six PRD scenarios plus the latency run | `pnpm --filter @kirchhoff/workflows scenarios` (`cre workflow simulate --broadcast` on 3 Anvil chains) | 7 / 7 PASS ([SIMULATION_LOG.md](workflows/SIMULATION_LOG.md), run 2026-10-05) |
 | Workflows on public testnets | `cre workflow simulate --target staging` | W2 `--broadcast` EPOCH on 3 testnets; W4 cron and `SpecActivated` `findings=0` at 14/15 reads ([SIMULATION_LOG.md](workflows/SIMULATION_LOG.md) "Staging") |
-| Judge | `pnpm --filter @kirchhoff/judge test` | 96 passed, 3 skipped (the skipped ones need `JUDGE_LIVE=1` and live Sepolia RPCs) |
-| AI | `pnpm --filter @kirchhoff/ai test` | 33 passed |
-| API | `pnpm --filter @kirchhoff/api test` | 28 passed |
-| Indexer | `pnpm --filter @kirchhoff/indexer test` | 10 passed |
+| Judge | `pnpm --filter @kirchhoff/judge test` | 105 passed, 3 skipped (the skipped ones need `JUDGE_LIVE=1` and live Sepolia RPCs) |
+| AI | `pnpm --filter @kirchhoff/ai test` | 47 passed |
+| API | `pnpm --filter @kirchhoff/api test` | 41 passed |
+| Indexer | `pnpm --filter @kirchhoff/indexer test` | 11 passed |
 | SDK | `pnpm --filter @kirchhoff/sdk test` | 8 passed |
 | MCP | `pnpm --filter @kirchhoff/mcp test` | 6 passed |
-| Demo | `pnpm --filter @kirchhoff/demo test` | 8 passed |
+| Demo | `pnpm --filter @kirchhoff/demo test` | 11 passed |
 | Web | Playwright, `web/e2e` (12 specs) | 124 / 124 passed: Mission Control, Incident Room, Attack Lab, Onboarding, Ops source links, stage snapshots, responsive, axe WCAG 2.2 AA on 11 routes in both themes, keyboard-only navigation |
 | AI evals | `ai/eval/run.ts` ([RESULTS.md](ai/eval/RESULTS.md), 2026-10-05) | provenance 100%, field accuracy 19 / 19, narrator citations 100%, prompt injection 0 of 10 misuse |
 | No AI in veto path | `bash scripts/no-ai-in-veto-path.sh` | OK |

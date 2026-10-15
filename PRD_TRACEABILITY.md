@@ -4,7 +4,7 @@ Every requirement in [docs/PRD.md](docs/PRD.md), sections 1 to 20, mapped to cod
 Audited 2026-10-05 against the working tree (including uncommitted files) by reading and grepping the code, running
 the test suites, and reading testnet state with `cast call`. Re-audited 2026-10-06 at commit `6ad7ab8` plus the
 working tree by reading and grepping the code, the commit log since `d9437b1`, the green GitHub CI run
-[37393797827](https://github.com/Adwaitbytes/kirchhoff-ccv/actions/runs/37393797827), `workflows/SIMULATION_LOG.md`,
+37393797827 (in the repository's earlier home; the latest green run, on `5fcfc4f`, is [38681992420](https://github.com/Adwaitbytes/kirchhoff-ccv/actions/runs/38681992420)), `workflows/SIMULATION_LOG.md`,
 `demo/logs/*.log`, the local Playwright report, and testnet state with `cast call` / `cast logs`. No suite was re-run
 locally for the re-audit.
 
